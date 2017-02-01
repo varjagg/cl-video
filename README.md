@@ -1,1 +1,6 @@
-This is the stub README.txt for the "cl-video" project.
+	Video file decoding in Common Lisp
+
+TODO:
+
+* AVI MJPEG chunk decoding
+* Rudimentary video stream player
