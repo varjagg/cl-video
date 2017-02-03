@@ -3,11 +3,17 @@
 (use-package :kit.sdl2)
 
 (defclass player-window (window)
-  ((bitmap :accessor bitmap)))
+  ((avi :accessor avi :initarg :avi)
+   (bitmap :accessor bitmap)))
+
+(defmethod initialize-instance :after ((w player-window) &key &allow-other-keys)
+  (setf (window-size w) (cons 640 480))
+  (setf (window-title w) "cl-video-player")
+  (setf (idle-render w) t))
 
 (defmethod render :after ((window player-window))
   (with-slots (bitmap) window
-    ))
+    (create-rgb-surface-from )))
 
 (defmethod textinput-event :after ((window player-window) ts text)
   (when (string= "Q" (string-upcase text))
