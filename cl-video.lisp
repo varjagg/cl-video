@@ -4,6 +4,9 @@
 
 (setf *print-circle* t)
 
+(eval-when (:compile-toplevel)
+  (defconstant +default-fps+ 25))
+
 (defclass chunk ()
   ((frame :accessor frame :initarg :frame)))
 
@@ -15,7 +18,10 @@
    (recommended-buffer-size :accessor recommended-buffer-size :initarg :recommended-buffer-size :initform 16384)
    (chunk-queue :accessor chunk-queue :initform (make-list 50))
    (rcursor :accessor rcursor)
-   (wcursor :accessor wcursor)))
+   (wcursor :accessor wcursor)
+   (width :accessor width :initarg :width :initform 640)
+   (height :accessor height :initarg :height :initform 480)
+   (fps :accessor fps :initarg :fps :initform +default-fps+)))
 
 (defmethod initialize-instance :after ((s avi-mjpeg-stream) &key)
   (loop for chunk on (chunk-queue s) do
@@ -28,6 +34,8 @@
 	(cdr (last (chunk-queue s))) (chunk-queue s)
 	(rcursor s) (chunk-queue s)
 	(wcursor s) (cdr (chunk-queue s))))
+
+(defgeneric handle-chunk ())
 
 (defgeneric decode (stream)
   (:documentation "Decodes the video stream"))
