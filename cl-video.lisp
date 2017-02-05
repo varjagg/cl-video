@@ -138,14 +138,16 @@
 (defmethod decode-media-stream ((rec mjpeg-stream-record) fsize input-stream)
   (bt:with-lock-held ((vacancy-lock (car (wcursor rec))))
     (jpeg:decode-stream input-stream :buffer (frame (car (wcursor rec)))
-			:descriptor (jpeg-descriptor rec))
+			:descriptor (jpeg-descriptor rec)) (print 'bar)
     (pop (wcursor rec))))
 
 (defmethod initialize-instance :after ((s avi-mjpeg-stream) &key &allow-other-keys)
   (setf (chunk-decoder s) #'(lambda (stream id size)
 			      (print id)
-			      (decode-media-stream (elt (stream-records s) (parse-integer (subseq id 0 1))) size stream)
-			      (when (plusp (padding s)) (loop repeat (rem size (padding s)) do (read-byte s))))))
+			      (if (member (subseq id 2) '("dc" "wb"))
+				  (progn (decode-media-stream (elt (stream-records s) (parse-integer (subseq id 0 1))) size stream)
+					 (when (plusp (padding s)) (loop repeat (rem size (padding s)) do (read-byte s))))
+				  (read-sequence (make-array size :element-type '(unsigned-byte 8)) stream)))))
 
 (defgeneric decode (stream)
   (:documentation "Decodes the video stream"))
@@ -174,7 +176,7 @@
        (cond ((and (string-equal (fcc-type rec) "vids") (string-equal (fcc-handler rec) "mjpg"))
 	      (change-class rec 'mjpeg-stream-record))
 	     ((string-equal (fcc-type rec) "auds") (change-class rec 'audio-stream-record)))
-       (return rec))
+       (return-from read-avi-stream-info rec))
   (error 'malformed-avi-file-format))
 
 (defmethod read-avi-header ((avi avi-mjpeg-stream) stream)
