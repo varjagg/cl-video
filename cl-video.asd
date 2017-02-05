@@ -4,7 +4,7 @@
   :description "Video decoder implemented in Common Lisp"
   :author "Eugene Zaikonnikov"
   :license "BSD"
-  :depends-on (#:cl-riff #:cl-jpeg #:bordeaux-threads)
+  :depends-on (#:cl-riff #:cl-jpeg #:bordeaux-threads #:flexi-streams)
   :serial t
   :components ((:file "package")
                (:file "cl-video")))
