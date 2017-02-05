@@ -1,4 +1,6 @@
-;;;; cl-video.lisp
+;;;; Video decoder implementation
+;;;; Supports MJPEG in AVI container
+;;;; (c) 2017 Eugene Zaikonnikov <eugene@fucall.org>
 
 (in-package #:cl-video)
 
@@ -57,52 +59,131 @@
 	     (declare (ignorable condition))
 	     (format stream "Unsupported AVI file format"))))
 
+(define-condition malformed-avi-file-format (media-decoder-error)
+  ()
+  (:report (lambda (condition stream)
+	     (declare (ignorable condition))
+	     (format stream "Malformed AVI file format"))))
+
 (defclass chunk ()
   ((lock :reader vacancy-lock :initform (bt:make-lock))
-   (stream-number :accessor stream-number)
    (frame :accessor frame :initarg :frame)))
+
+(defclass stream-record ()
+  ((fcc-type :accessor fcc-type)
+   (fcc-handler :accessor fcc-handler)
+   (flags :accessor flags)
+   (priority :accessor priority)
+   (language :accessor language)
+   (initial-frames :accessor initial-frames)
+   (scale :accessor scale)
+   (rate :accessor rate)
+   (start :accessor start)
+   (stream-length :accessor stream-length)
+   (suggested-buffer-size :accessor suggested-buffer-size)
+   (quality :accessor quality)
+   (sample-size :accessor sample-size)
+   (frame :accessor frame)
+   (index :accessor index)
+   (chunk-queue :accessor chunk-queue :initform (make-list (* 2 +default-fps+)))
+   (rcursor :accessor rcursor)
+   (wcursor :accessor wcursor)
+   (avi :accessor avi :initarg :avi)))
+
+(defclass mjpeg-stream-record (stream-record)
+  ((jpeg-descriptor :accessor jpeg-descriptor :initform (cl-jpeg::make-descriptor))))
+
+(defmethod shared-initialize :after ((rec mjpeg-stream-record) slots &key &allow-other-keys)
+  (declare (ignorable slots))
+  (flexi-streams:with-input-from-sequence (is +avi-dht+)
+    (jpeg::read-dht (jpeg-descriptor rec) is))
+  (setf (chunk-queue rec) (make-list (* 2 (floor (rate rec) (scale rec)))))
+  (loop for chunk on (chunk-queue rec) do
+       (setf (car chunk) (make-instance 'chunk :frame 
+					(make-array (if (string-equal (fcc-type rec) "vids")
+							(* (width avi) (height avi)) ;;we store decoded frames
+							(suggested-buffer-size rec)) :element-type '(unsigned-byte 8)))))
+  (setf (cdr (last (chunk-queue rec))) (chunk-queue rec)
+	(rcursor rec) (chunk-queue rec)
+	(wcursor rec) (cdr (chunk-queue rec))))
+
+(defclass audio-stream-record (stream-record)
+  ())
+
+(defmethod shared-initialize :after ((rec audio-stream-record) slots &key &allow-other-keys)
+  (declare (ignorable slots))
+  (flexi-streams:with-input-from-sequence (is +avi-dht+)
+    (jpeg::read-dht (jpeg-descriptor rec) is))
+  (setf (chunk-queue rec) (make-list (* 2 (floor (rate rec) (scale rec)))))
+  (loop for chunk on (chunk-queue rec) do
+       (setf (car chunk) (make-instance 'chunk :frame 
+					(make-array (if (string-equal (fcc-type rec) "vids")
+							(* (width avi) (height avi)) ;;we store decoded frames
+							(suggested-buffer-size rec)) :element-type '(unsigned-byte 8)))))
+  (setf (cdr (last (chunk-queue rec))) (chunk-queue rec)
+	(rcursor rec) (chunk-queue rec)
+	(wcursor rec) (cdr (chunk-queue rec))))
 
 (defclass video-stream ()
   ((filename :accessor filename :initarg :filename :initform nil)))
 
 (defclass avi-mjpeg-stream (video-stream)
   ((chunk-decoder :accessor chunk-decoder)
-   (recommended-buffer-size :accessor recommended-buffer-size :initarg :recommended-buffer-size :initform 16384)
-   (chunk-queue :accessor chunk-queue :initarg :chuck-queue :initform (make-list (* 2 +default-fps+)))
-   (rcursor :accessor rcursor)
-   (wcursor :accessor wcursor)
    (width :accessor width :initarg :width :initform 640)
    (height :accessor height :initarg :height :initform 480)
-   (jpeg-descriptor :accessor jpeg-descriptor :initform (cl-jpeg::make-descriptor))
    (padding :accessor padding :initform 1)
    (flags :accessor flags)
    (nstreams :accessor nstreams)
-   (fps :accessor fps :initarg :fps :initform +default-fps+)))
+   (stream-records :accessor stream-records)))
 
-(defmethod initialize-instance :after ((s avi-mjpeg-stream) &key)
-  (flexi-streams:with-input-from-sequence (is +avi-dht+)
-    (jpeg::read-dht (jpeg-descriptor s) is))
-  (loop for chunk on (chunk-queue s) do
-       (setf (car chunk) (make-instance 'chunk :frame (make-array (* (width s) (height s)) :element-type '(unsigned-byte 8)))))
+(defgeneric decode-media-stream (record fsize input-stream))
+
+(defmethod decode-media-stream ((rec stream-record) fsize input-stream)
+  (read-sequence (frame (car (wcursor rec))) input-stream :end (1- fsize)))
+
+(defmethod decode-media-stream ((rec mjpeg-stream-record) fsize input-stream)
+  (bt:with-lock-held ((vacancy-lock (car (wcursor rec))))
+    (jpeg:decode-stream input-stream :buffer (frame (car (wcursor rec)))
+			:descriptor (jpeg-descriptor rec))
+    (pop (wcursor rec))))
+
+(defmethod initialize-instance :after ((s avi-mjpeg-stream) &key &allow-other-keys)
   (setf (chunk-decoder s) #'(lambda (stream id size)
 			      (print id)
-			      (cond ((string-equal (subseq id 2) "dc")
-				     (bt:with-lock-held ((vacancy-lock (car (wcursor s))))
-				       (setf (stream-number (car (wcursor s))) (parse-integer (subseq id 0 1)))
-				       (jpeg:decode-stream stream :buffer (frame (car (wcursor s)))
-							   :descriptor (jpeg-descriptor s))
-				       (pop (wcursor s)))
-				     ;; take care of the padding
-				       (loop repeat (padding s) do (read-byte s)))
-				    (t (read-sequence (make-array size :element-type '(unsigned-byte 8)) stream))))
-	(cdr (last (chunk-queue s))) (chunk-queue s)
-	(rcursor s) (chunk-queue s)
-	(wcursor s) (cdr (chunk-queue s))))
+			      (decode-media-stream (elt (stream-records s) (parse-integer (subseq id 0 1))) size stream)
+			      (when (plusp (padding s)) (loop repeat (rem size (padding s)) do (read-byte s))))))
 
 (defgeneric decode (stream)
   (:documentation "Decodes the video stream"))
 
-(defun read-avi-header (avi stream)
+(defmethod read-avi-stream-info ((avi avi-mjpeg-stream) stream)
+  (loop for chunk = (riff:read-riff-chunk stream)
+     with rec = (make-instance 'stream-record :avi avi)
+     when (string-equal (riff:riff-chunk-id chunk) "strh") do
+       (flexi-streams:with-input-from-sequence (is (riff:riff-chunk-data chunk))
+	 (setf (fcc-type rec) (riff::read-fourcc is)
+	       (fcc-handler rec) (riff::read-fourcc is)
+	       (flags rec) (riff:read-u4 is)
+	       (priority rec) (riff:read-u2 is)
+	       (language rec) (riff:read-u2 is)
+	       (initial-frames rec) (riff:read-u4 is)
+	       (scale rec) (riff:read-u4 is)
+	       (rate rec) (riff:read-u4 is)
+	       (start rec) (riff:read-u4 is)
+	       (stream-length rec) (riff:read-u4 is)
+	       (suggested-buffer-size rec) (riff:read-u4 is)
+	       (quality rec) (riff:read-u4 is)
+	       (sample-size rec) (riff:read-u4 is)
+	       (frame rec) (list (riff:read-u4 is) (riff:read-u4 is) (riff:read-u4 is) (riff:read-u4 is))))
+       (when (and (string-equal (fcc-type rec) "vids") (not (member (fcc-handler rec) '("mjpg") :test #'string-equal)))
+	 (error 'unsupported-avi-file-format))
+       (cond ((and (string-equal (fcc-type rec) "vids") (string-equal (fcc-handler rec) "mjpg"))
+	      (change-class rec 'mjpeg-stream-record))
+	     ((string-equal (fcc-type rec) "auds") (change-class rec 'audio-stream-record)))
+       (return rec))
+  (error 'malformed-avi-format))
+
+(defmethod read-avi-header ((avi avi-mjpeg-stream) stream)
   (loop for chunk = (riff:read-riff-chunk stream)
      when (string-equal (riff:riff-chunk-id chunk) "avih") do
        (flexi-streams:with-input-from-sequence (is (riff:riff-chunk-data chunk))
@@ -117,6 +198,8 @@
 	 (setf (width avi) (riff:read-u4 is)
 	       (height avi) (riff:read-u4 is))
 	 (riff:read-u4 is) (riff:read-u4 is) (riff:read-u4 is) (riff:read-u4 is))
+       (setf (stream-records avi)
+	     (loop repeat (nstreams avi) collecting (read-avi-stream-info avi stream)))
        (return)))
 
 (defmethod decode ((avi avi-mjpeg-stream))
