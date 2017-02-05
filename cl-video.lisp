@@ -7,8 +7,6 @@
 (setf *print-circle* t)
 
 (eval-when (:compile-toplevel)
-  (defconstant +default-fps+ 25)
-
   (defconstant +avi-dht+
     #(#x01 #xA2 
       #x00 #x00 #x01 #x05 #x01 #x01 #x01 #x01 #x01 #x01 #x00 #x00 #x00 #x00 #x00 
@@ -42,8 +40,8 @@
       #x99 #x9A #xA2 #xA3 #xA4 #xA5 #xA6 #xA7 #xA8 #xA9 #xAA #xB2 #xB3 #xB4 #xB5 
       #xB6 #xB7 #xB8 #xB9 #xBA #xC2 #xC3 #xC4 #xC5 #xC6 #xC7 #xC8 #xC9 #xCA #xD2 
       #xD3 #xD4 #xD5 #xD6 #xD7 #xD8 #xD9 #xDA #xE2 #xE3 #xE4 #xE5 #xE6 #xE7 #xE8 
-      #xE9 #xEA #xF2 #xF3 #xF4 #xF5 #xF6 #xF7 #xF8 #xF9 #xFA))
-  )
+      #xE9 #xEA #xF2 #xF3 #xF4 #xF5 #xF6 #xF7 #xF8 #xF9 #xFA)))
+
 (define-condition media-decoder-error (error)
   ())
 
@@ -85,7 +83,7 @@
    (sample-size :accessor sample-size)
    (frame :accessor frame)
    (index :accessor index)
-   (chunk-queue :accessor chunk-queue :initform (make-list (* 2 +default-fps+)))
+   (chunk-queue :accessor chunk-queue)
    (rcursor :accessor rcursor)
    (wcursor :accessor wcursor)
    (avi :accessor avi :initarg :avi)))
