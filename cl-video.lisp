@@ -100,7 +100,7 @@
   (setf (chunk-queue rec) (make-list (* 2 (floor (rate rec) (scale rec)))))
   (loop for chunk on (chunk-queue rec) do
        (setf (car chunk) (make-instance 'chunk :frame 
-					(make-array (* (width (avi rec)) (height (avi rec))) :element-type '(unsigned-byte 8)))))
+					(make-array (* 3 (width (avi rec)) (height (avi rec))) :element-type '(unsigned-byte 8)))))
   (setf (cdr (last (chunk-queue rec))) (chunk-queue rec)
 	(rcursor rec) (chunk-queue rec)
 	(wcursor rec) (cdr (chunk-queue rec))))
@@ -128,24 +128,25 @@
    (padding :accessor padding :initform 1)
    (flags :accessor flags)
    (nstreams :accessor nstreams)
+   (player-callback :accessor player-callback :initform nil)
    (stream-records :accessor stream-records)))
 
 (defgeneric decode-media-stream (record fsize input-stream))
 
 (defmethod decode-media-stream ((rec stream-record) fsize input-stream)
-  (read-sequence (frame (car (wcursor rec))) input-stream :end (1- fsize)))
+  (read-sequence (frame (car (wcursor rec))) input-stream :end fsize))
 
 (defmethod decode-media-stream ((rec mjpeg-stream-record) fsize input-stream)
   (bt:with-lock-held ((vacancy-lock (car (wcursor rec))))
     (jpeg:decode-stream input-stream :buffer (frame (car (wcursor rec)))
-			:descriptor (jpeg-descriptor rec)) (print 'bar)
+			:descriptor (jpeg-descriptor rec))
     (pop (wcursor rec))))
 
 (defmethod initialize-instance :after ((s avi-mjpeg-stream) &key &allow-other-keys)
   (setf (chunk-decoder s) #'(lambda (stream id size)
 			      (print id)
-			      (if (member (subseq id 2) '("dc" "wb"))
-				  (progn (decode-media-stream (elt (stream-records s) (parse-integer (subseq id 0 1))) size stream)
+			      (if (member (subseq id 2) '("dc" "wb") :test #'string-equal)
+				  (progn (decode-media-stream (elt (stream-records s) (parse-integer (subseq id 0 2))) size stream)
 					 (when (plusp (padding s)) (loop repeat (rem size (padding s)) do (read-byte s))))
 				  (read-sequence (make-array size :element-type '(unsigned-byte 8)) stream)))))
 
@@ -208,6 +209,8 @@
 	(error 'unrecognized-file-format))
       (cond ((string-equal fourcc "avi ") (read-avi-header avi stream))
 	    (t (error 'unsupported-avi-file-format))))
+    (when (player-callback avi)
+      (funcall (player-callback avi) avi))
     (loop for chunk = (riff:read-riff-chunk stream :chunk-data-reader (chunk-decoder avi))
 	 while chunk)))
 
