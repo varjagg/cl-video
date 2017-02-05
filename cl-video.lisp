@@ -128,7 +128,7 @@
    (padding :accessor padding :initform 1)
    (flags :accessor flags)
    (nstreams :accessor nstreams)
-   (player-callback :accessor player-callback :initform nil)
+   (player-callback :accessor player-callback :initform nil) ;;called once all headers are processed
    (stream-records :accessor stream-records)))
 
 (defgeneric decode-media-stream (record fsize input-stream))
