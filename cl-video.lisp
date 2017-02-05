@@ -99,8 +99,7 @@
     (jpeg::read-dht (jpeg-descriptor rec) is))
   (setf (chunk-queue rec) (make-list (* 2 (floor (rate rec) (scale rec)))))
   (loop for chunk on (chunk-queue rec) do
-       (setf (car chunk) (make-instance 'chunk :frame 
-					(make-array (* 3 (width (avi rec)) (height (avi rec))) :element-type '(unsigned-byte 8)))))
+       (setf (car chunk) (make-instance 'chunk :frame (jpeg:allocate-buffer (height (avi rec)) (width (avi rec)) 3))))
   (setf (cdr (last (chunk-queue rec))) (chunk-queue rec)
 	(rcursor rec) (chunk-queue rec)
 	(wcursor rec) (cdr (chunk-queue rec))))
@@ -125,7 +124,7 @@
   ((chunk-decoder :accessor chunk-decoder)
    (width :accessor width :initarg :width :initform 640)
    (height :accessor height :initarg :height :initform 480)
-   (padding :accessor padding :initform 1)
+   (padding :accessor padding :initform 0)
    (flags :accessor flags)
    (nstreams :accessor nstreams)
    (player-callback :accessor player-callback :initform nil) ;;called once all headers are processed
@@ -144,7 +143,7 @@
 
 (defmethod initialize-instance :after ((s avi-mjpeg-stream) &key &allow-other-keys)
   (setf (chunk-decoder s) #'(lambda (stream id size)
-			      (print id)
+			      (format t "~A size ~D~%" id size)
 			      (if (member (subseq id 2) '("dc" "wb") :test #'string-equal)
 				  (progn (decode-media-stream (elt (stream-records s) (parse-integer (subseq id 0 2))) size stream)
 					 (when (plusp (padding s)) (loop repeat (rem size (padding s)) do (read-byte s))))
