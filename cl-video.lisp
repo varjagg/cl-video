@@ -100,9 +100,7 @@
   (setf (chunk-queue rec) (make-list (* 2 (floor (rate rec) (scale rec)))))
   (loop for chunk on (chunk-queue rec) do
        (setf (car chunk) (make-instance 'chunk :frame 
-					(make-array (if (string-equal (fcc-type rec) "vids")
-							(* (width avi) (height avi)) ;;we store decoded frames
-							(suggested-buffer-size rec)) :element-type '(unsigned-byte 8)))))
+					(make-array (* (width (avi rec)) (height (avi rec))) :element-type '(unsigned-byte 8)))))
   (setf (cdr (last (chunk-queue rec))) (chunk-queue rec)
 	(rcursor rec) (chunk-queue rec)
 	(wcursor rec) (cdr (chunk-queue rec))))
@@ -112,14 +110,10 @@
 
 (defmethod shared-initialize :after ((rec audio-stream-record) slots &key &allow-other-keys)
   (declare (ignorable slots))
-  (flexi-streams:with-input-from-sequence (is +avi-dht+)
-    (jpeg::read-dht (jpeg-descriptor rec) is))
-  (setf (chunk-queue rec) (make-list (* 2 (floor (rate rec) (scale rec)))))
+  (setf (chunk-queue rec) (make-list 16))
   (loop for chunk on (chunk-queue rec) do
        (setf (car chunk) (make-instance 'chunk :frame 
-					(make-array (if (string-equal (fcc-type rec) "vids")
-							(* (width avi) (height avi)) ;;we store decoded frames
-							(suggested-buffer-size rec)) :element-type '(unsigned-byte 8)))))
+					(make-array (suggested-buffer-size rec) :element-type '(unsigned-byte 8)))))
   (setf (cdr (last (chunk-queue rec))) (chunk-queue rec)
 	(rcursor rec) (chunk-queue rec)
 	(wcursor rec) (cdr (chunk-queue rec))))
@@ -174,14 +168,14 @@
 	       (suggested-buffer-size rec) (riff:read-u4 is)
 	       (quality rec) (riff:read-u4 is)
 	       (sample-size rec) (riff:read-u4 is)
-	       (frame rec) (list (riff:read-u4 is) (riff:read-u4 is) (riff:read-u4 is) (riff:read-u4 is))))
+	       (frame rec) (list (riff:read-u2 is) (riff:read-u2 is) (riff:read-u2 is) (riff:read-u2 is))))
        (when (and (string-equal (fcc-type rec) "vids") (not (member (fcc-handler rec) '("mjpg") :test #'string-equal)))
 	 (error 'unsupported-avi-file-format))
        (cond ((and (string-equal (fcc-type rec) "vids") (string-equal (fcc-handler rec) "mjpg"))
 	      (change-class rec 'mjpeg-stream-record))
 	     ((string-equal (fcc-type rec) "auds") (change-class rec 'audio-stream-record)))
        (return rec))
-  (error 'malformed-avi-format))
+  (error 'malformed-avi-file-format))
 
 (defmethod read-avi-header ((avi avi-mjpeg-stream) stream)
   (loop for chunk = (riff:read-riff-chunk stream)
