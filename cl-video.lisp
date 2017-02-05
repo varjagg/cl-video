@@ -42,9 +42,24 @@
     #xD3 #xD4 #xD5 #xD6 #xD7 #xD8 #xD9 #xDA #xE2 #xE3 #xE4 #xE5 #xE6 #xE7 #xE8 
     #xE9 #xEA #xF2 #xF3 #xF4 #xF5 #xF6 #xF7 #xF8 #xF9 #xFA))
   )
+(define-condition media-decoder-error (error)
+  ())
+
+(define-condition unrecognized-file-format (media-decoder-error)
+  ()
+  (:report (lambda (condition stream)
+	     (declare (ignorable condition))
+	     (format stream "Unrecognized AVI file format"))))
+
+(define-condition unsupported-file-format (media-decoder-error)
+  ()
+  (:report (lambda (condition stream)
+	     (declare (ignorable condition))
+	     (format stream "Unsupported AVI file format"))))
 
 (defclass chunk ()
-  ((frame :accessor frame :initarg :frame)))
+  ((stream-number :accessor stream-number)
+   (frame :accessor frame :initarg :frame)))
 
 (defclass video-stream ()
   ((filename :accessor filename :initarg :filename :initform nil)))
@@ -58,19 +73,24 @@
    (width :accessor width :initarg :width :initform 640)
    (height :accessor height :initarg :height :initform 480)
    (jpeg-descriptor :accessor jpeg-descriptor :initform (cl-jpeg::make-descriptor))
+   (padding :accessor padding :initform 1)
    (fps :accessor fps :initarg :fps :initform +default-fps+)))
 
 (defmethod initialize-instance :after ((s avi-mjpeg-stream) &key)
   (flexi-streams:with-input-from-sequence (is +avi-dht+)
     (jpeg::read-dht (jpeg-descriptor s) is))
   (loop for chunk on (chunk-queue s) do
-       (setf (car chunk) (make-instance 'chunk :frame (make-array (recommended-buffer-size s) :element-type '(unsigned-byte 8)))))
+       (setf (car chunk) (make-instance 'chunk :frame (make-array (* (width s) (height s)) :element-type '(unsigned-byte 8)))))
   (setf (chunk-decoder s) #'(lambda (stream id size)
 			      (declare (ignorable id))
 			      (when (> size (length (frame (wcursor s))))
 				(setf (frame (wcursor s)) (make-array size :element-type '(unsigned-byte 8))))
-			      (cond ((string= id "00dc") (jpeg:decode-stream stream :buffer (frame (wcursor s))
-									     :descriptor (jpeg-descriptor s)))
+			      (cond ((string= (subseq id 2) "dc")
+				     (setf (stream-number (frame (wcursor s))) (parse-integer (subseq id 0 1)))
+				     (jpeg:decode-stream stream :buffer (frame (wcursor s))
+							 :descriptor (jpeg-descriptor s))
+				     ;; take care of the padding
+				     (loop repeat (rem size (padding s)) do (read-byte s)))
 				    (t (read-sequence (make-array size :element-type '(unsigned-byte 8)) stream))))
 	(cdr (last (chunk-queue s))) (chunk-queue s)
 	(rcursor s) (chunk-queue s)
@@ -81,7 +101,16 @@
 
 (defmethod decode ((avi avi-mjpeg-stream))
   (with-open-file (stream (filename avi) :direction :input :element-type '(unsigned-byte 8))
-    (riff:read-riff-chunk stream :chunk-data-reader (chunk-decoder avi))))
+    ;; read AVI header first
+    (destructuring-bind (id size fourcc) (riff:read-riff-chunk stream)
+      (declare (ignorable size))
+      (unless (string= id "riff")
+	(error 'unrecognized-avi-file-format))
+      (cond ((string= fourcc "avi ") )
+	    ((string= fourcc "avix") )
+	    (t (error 'unsupported-avi-file-format))))
+    (loop for chunk = (riff:read-riff-chunk stream :chunk-data-reader (chunk-decoder avi))
+	 while chunk)))
 
 (defun decode-file (pathname)
     (let ((avi-stream (make-instance 'avi-mjpeg-stream :filename pathname)))
