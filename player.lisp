@@ -25,7 +25,7 @@
 				 with src = (frame (pop (rcursor rec))) do
 				   (loop for j from 0 below width
 				      for spos = (* 3 (+ j (* width i))) do
-					(setf (aref buffer j i)
+					(setf (aref buffer i j)
 					      (logior (ash (aref src (+ 2 spos)) 16) (ash (aref src (1+ spos)) 8) (aref src spos)))))
 			      (sleep (/ (scale rec) (rate rec)))
 			      (xlib:put-image pixmap pixmap-gc image :width width :height height :x 0 :y 0)
