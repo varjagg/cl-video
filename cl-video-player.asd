@@ -2,6 +2,6 @@
   :description "Video decoder implemented in Common Lisp"
   :author "Eugene Zaikonnikov"
   :license "BSD"
-  :depends-on (#:cl-video #:clx #:bordeaux-threads #:static-vectors)
+  :depends-on (#:cl-video #:clx #:bordeaux-threads)
   :serial t
   :components ((:file "player")))
