@@ -16,23 +16,22 @@
 					   :height height :width width))
 		(rec (find-if #'(lambda (x) (eql (type-of x) 'mjpeg-stream-record)) stream-records)))
 	   (unwind-protect
-		(setf (xlib:wm-name window) (pathname-name (filename avi)))
-	     (xlib:map-window window)
-	     (xlib:event-case (display :discard-p t)
-	       (exposure ()
-			 (loop for i from 0 below height
-			    with src = (frame (pop (rcursor rec))) do
-			      (loop for j from 0 below width
-				 for spos = (* 3 (+ j (* width i))) do
-				   (setf (aref buffer j i)
-					 (logior (ash (aref src (+ 2 spos)) 16) (ash (aref src (1+ spos)) 8) (aref src spos)))))
-			 (sleep (/ (scale rec) (rate rec)))
-			 (xlib:put-image pixmap pixmap-gc image :width width :height height :x 0 :y 0)
-			 (xlib:copy-area pixmap gc 0 0 width height window 0 0)
-			 (xlib:display-force-output display)
-			 nil)
-	       (key-press ()
-			  t)))
+		(progn
+		  (xlib:event-case (display :discard-p t)
+		    (exposure ()
+			      (loop for i from 0 below height
+				 with src = (frame (pop (rcursor rec))) do
+				   (loop for j from 0 below width
+				      for spos = (* 3 (+ j (* width i))) do
+					(setf (aref buffer j i)
+					      (logior (ash (aref src (+ 2 spos)) 16) (ash (aref src (1+ spos)) 8) (aref src spos)))))
+			      (sleep (/ (scale rec) (rate rec)))
+			      (xlib:put-image pixmap pixmap-gc image :width width :height height :x 0 :y 0)
+			      (xlib:copy-area pixmap gc 0 0 width height window 0 0)
+			      (xlib:display-force-output display)
+			      nil)
+		    (key-press ()
+			       t))))
 	   (xlib:free-pixmap pixmap)
 	   (xlib:free-gcontext gc)
 	   (xlib:close-display display))))))
