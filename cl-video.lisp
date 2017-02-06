@@ -102,7 +102,7 @@
        (setf (car chunk) (make-instance 'chunk :frame (jpeg:allocate-buffer (height (avi rec)) (width (avi rec)) 3))))
   (setf (cdr (last (chunk-queue rec))) (chunk-queue rec)
 	(rcursor rec) (chunk-queue rec)
-	(wcursor rec) (cdr (chunk-queue rec))))
+	(wcursor rec) (chunk-queue rec)))
 
 (defclass audio-stream-record (stream-record)
   ())
@@ -115,7 +115,7 @@
 					(make-array (suggested-buffer-size rec) :element-type '(unsigned-byte 8)))))
   (setf (cdr (last (chunk-queue rec))) (chunk-queue rec)
 	(rcursor rec) (chunk-queue rec)
-	(wcursor rec) (cdr (chunk-queue rec))))
+	(wcursor rec) (chunk-queue rec)))
 
 (defclass video-stream ()
   ((filename :accessor filename :initarg :filename :initform nil)))
@@ -146,7 +146,7 @@
 
 (defmethod initialize-instance :after ((s avi-mjpeg-stream) &key &allow-other-keys)
   (setf (chunk-decoder s) #'(lambda (stream id size)
-			      (format t "~A size ~D~%" id size)
+			      #+nil(format t "~A size ~D~%" id size)
 			      (if (member (subseq id 2) '("dc" "wb") :test #'string-equal)
 				  (progn (decode-media-stream (elt (stream-records s) (parse-integer (subseq id 0 2))) size stream)
 					 (when (plusp (padding s)) (loop repeat (rem size (padding s)) do (read-byte s))))
