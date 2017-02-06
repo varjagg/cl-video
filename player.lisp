@@ -17,6 +17,8 @@
 		(rec (find-if #'(lambda (x) (eql (type-of x) 'mjpeg-stream-record)) stream-records)))
 	   (unwind-protect
 		(progn
+		  (setf (xlib:wm-name window) (pathname-name (filename avi)))
+		  (xlib:map-window window)
 		  (xlib:event-case (display :discard-p t)
 		    (exposure ()
 			      (loop for i from 0 below height
@@ -31,10 +33,10 @@
 			      (xlib:display-force-output display)
 			      nil)
 		    (key-press ()
-			       t))))
-	   (xlib:free-pixmap pixmap)
-	   (xlib:free-gcontext gc)
-	   (xlib:close-display display))))))
+			       t)))
+	     (xlib:free-pixmap pixmap)
+	     (xlib:free-gcontext gc)
+	     (xlib:close-display display)))))))
 
 (defun play (pathname)
   (decode-file pathname :player-callback #'play-stream))
