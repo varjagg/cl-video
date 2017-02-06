@@ -89,13 +89,15 @@
    (avi :accessor avi :initarg :avi)))
 
 (defclass mjpeg-stream-record (stream-record)
-  ((jpeg-descriptor :accessor jpeg-descriptor :initform (cl-jpeg::make-descriptor))))
+  ((buffer :accessor buffer :type '(unsigned-byte 8))
+   (jpeg-descriptor :accessor jpeg-descriptor :initform (cl-jpeg::make-descriptor))))
 
 (defmethod shared-initialize :after ((rec mjpeg-stream-record) slots &key &allow-other-keys)
   (declare (ignorable slots))
   (flexi-streams:with-input-from-sequence (is +avi-dht+)
     (jpeg::read-dht (jpeg-descriptor rec) is))
-  (setf (chunk-queue rec) (make-list (* 2 (floor (rate rec) (scale rec)))))
+  (setf (buffer rec) (make-array (suggested-buffer-size rec) :element-type '(unsigned-byte 8))
+	(chunk-queue rec) (make-list (* 2 (floor (rate rec) (scale rec)))))
   (loop for chunk on (chunk-queue rec) do
        (setf (car chunk) (make-instance 'chunk :frame (jpeg:allocate-buffer (height (avi rec)) (width (avi rec)) 3))))
   (setf (cdr (last (chunk-queue rec))) (chunk-queue rec)
@@ -125,7 +127,8 @@
    (padding :accessor padding :initform 0)
    (flags :accessor flags)
    (nstreams :accessor nstreams)
-   (player-callback :accessor player-callback :initform nil) ;;called once all headers are processed
+   (player-callback :accessor player-callback :initarg :player-callback :initform nil) ;;called once all headers are processed
+   (finished :accessor finished :initform nil)
    (stream-records :accessor stream-records)))
 
 (defgeneric decode-media-stream (record fsize input-stream))
@@ -135,8 +138,10 @@
 
 (defmethod decode-media-stream ((rec mjpeg-stream-record) fsize input-stream)
   (bt:with-lock-held ((vacancy-lock (car (wcursor rec))))
-    (jpeg:decode-stream input-stream :buffer (frame (car (wcursor rec)))
-			:descriptor (jpeg-descriptor rec))
+    (read-sequence (buffer rec) input-stream :end fsize)
+    (flexi-streams:with-input-from-sequence (is (buffer rec))
+      (jpeg:decode-stream is :buffer (frame (car (wcursor rec)))
+			  :descriptor (jpeg-descriptor rec)))
     (pop (wcursor rec))))
 
 (defmethod initialize-instance :after ((s avi-mjpeg-stream) &key &allow-other-keys)
@@ -211,8 +216,8 @@
     (loop for chunk = (riff:read-riff-chunk stream :chunk-data-reader (chunk-decoder avi))
 	 while chunk)))
 
-(defun decode-file (pathname)
-  (let ((avi-stream (make-instance 'avi-mjpeg-stream :filename pathname)))
+(defun decode-file (pathname &key player-callback)
+  (let ((avi-stream (make-instance 'avi-mjpeg-stream :filename pathname :player-callback player-callback)))
     (decode avi-stream)))
 
 (defun show-file-chunks (pathname)
