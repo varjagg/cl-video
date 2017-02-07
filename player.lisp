@@ -22,6 +22,7 @@
 		  (stream-playback-start rec)
 		  (loop for cur = (pop (rcursor rec))
 		     for src = (frame cur) do
+		       (xlib:clear-area window)
 		       (loop for i from 0 below height do
 			    (loop for j from 0 below width
 			       for spos = (* 3 (+ j (* width i))) do
