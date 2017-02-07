@@ -6,7 +6,9 @@
 
 (setf *print-circle* t)
 
-(eval-when (:compile-toplevel)
+(eval-when (:compile-toplevel) 
+  (defconstant +avif-must-use-index+ #x20) 
+
   (defconstant +avi-dht+
     #(#x01 #xA2 
       #x00 #x00 #x01 #x05 #x01 #x01 #x01 #x01 #x01 #x01 #x00 #x00 #x00 #x00 #x00 
@@ -199,6 +201,8 @@
 	 (riff:read-u4 is)   ;;dwMaxBytesPerSec
 	 (setf (padding avi) (riff:read-u4 is)
 	       (flags avi) (riff:read-u4 is))
+	 (unless (zerop (logand (flags avi) +avif-must-use-index+))
+	   (format t "CL-VIDEO WARNING: must use index flag is set, frame order is possibly incorrect~%"))
 	 (riff:read-u4 is)   ;;dwTotalFrames
 	 (riff:read-u4 is)   ;;dwInitialFrames
 	 (setf (nstreams avi) (riff:read-u4 is))
