@@ -86,7 +86,14 @@
    (chunk-queue :accessor chunk-queue)
    (rcursor :accessor rcursor)
    (wcursor :accessor wcursor)
+   (final :accessor final :initform nil)
    (avi :accessor avi :initarg :avi)))
+
+(defmethod stream-playback-start ((rec stream-record))
+  (bt:acquire-lock (vacancy-lock (car (rcursor rec)))))
+
+(defmethod stream-playback-stop ((rec stream-record))
+  (bt:release-lock (vacancy-lock (car (rcursor rec)))))
 
 (defclass mjpeg-stream-record (stream-record)
   ((buffer :accessor buffer :type '(unsigned-byte 8))
@@ -97,12 +104,12 @@
   (flexi-streams:with-input-from-sequence (is +avi-dht+)
     (jpeg::read-dht (jpeg-descriptor rec) is))
   (setf (buffer rec) (make-array (suggested-buffer-size rec) :element-type '(unsigned-byte 8))
-	(chunk-queue rec) (make-list (* 2 (floor (rate rec) (scale rec)))))
+	(chunk-queue rec) (make-list (max 5 (* 2 (floor (rate rec) (scale rec)))))) ;at least 5 chunks to prevent cursor deadlocks
   (loop for chunk on (chunk-queue rec) do
        (setf (car chunk) (make-instance 'chunk :frame (jpeg:allocate-buffer (height (avi rec)) (width (avi rec)) 3))))
   (setf (cdr (last (chunk-queue rec))) (chunk-queue rec)
 	(rcursor rec) (chunk-queue rec)
-	(wcursor rec) (chunk-queue rec)))
+	(wcursor rec) (cdr (chunk-queue rec))))
 
 (defclass audio-stream-record (stream-record)
   ())
@@ -115,7 +122,7 @@
 					(make-array (suggested-buffer-size rec) :element-type '(unsigned-byte 8)))))
   (setf (cdr (last (chunk-queue rec))) (chunk-queue rec)
 	(rcursor rec) (chunk-queue rec)
-	(wcursor rec) (chunk-queue rec)))
+	(wcursor rec) (cdr (chunk-queue rec))))
 
 (defclass video-stream ()
   ((filename :accessor filename :initarg :filename :initform nil)))
@@ -128,7 +135,6 @@
    (flags :accessor flags)
    (nstreams :accessor nstreams)
    (player-callback :accessor player-callback :initarg :player-callback :initform nil) ;;called once all headers are processed
-   (finished :accessor finished :initform nil)
    (stream-records :accessor stream-records)))
 
 (defgeneric decode-media-stream (record fsize input-stream))
@@ -146,11 +152,6 @@
       (jpeg:decode-stream is :buffer (frame chunk)
 			  :descriptor (jpeg-descriptor rec)))
     (bt:release-lock cur-lock)))
-
-(defmethod pop-chunk ((rec stream-record))
-  (bt:with-lock-held ((vacancy-lock (car (rcursor rec))))
-    (prog1 (car (rcursor rec))
-      (pop (rcursor rec)))))
 
 (defmethod initialize-instance :after ((s avi-mjpeg-stream) &key &allow-other-keys)
   (setf (chunk-decoder s) #'(lambda (stream id size)
@@ -222,11 +223,15 @@
 	(error 'unrecognized-file-format))
       (cond ((string-equal fourcc "avi ") (read-avi-header avi stream))
 	    (t (error 'unsupported-avi-file-format))))
-    (bt:acquire-lock (vacancy-lock (car (wcursor (find-mjpeg-stream-record avi))))) ;the player shouldn't start before 1st frame is decoded
+    (loop for rec in (stream-records avi) do
+	 (bt:acquire-lock (vacancy-lock (car (wcursor rec))))) ;the player shouldn't start before 1st frame is decoded
     (when (player-callback avi)
       (funcall (player-callback avi) avi))
     (loop for chunk = (riff:read-riff-chunk stream :chunk-data-reader (chunk-decoder avi))
-	 while chunk)))
+	 while chunk)
+    (loop for rec in (stream-records avi) do 
+	 (setf (final rec) (car (wcursor rec)))
+	 (bt:release-lock (vacancy-lock (car (wcursor rec)))))))
 
 (defun decode-file (pathname &key player-callback)
   (let ((avi-stream (make-instance 'avi-mjpeg-stream :filename pathname :player-callback player-callback)))
