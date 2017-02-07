@@ -149,11 +149,8 @@
     (bt:acquire-lock (vacancy-lock new-chunk))
     (read-sequence (buffer rec) input-stream :end fsize)
     (flexi-streams:with-input-from-sequence (is (buffer rec))
-      (let ((descriptor (cl-jpeg::make-descriptor)))
-	(flexi-streams:with-input-from-sequence (i +avi-dht+)
-	  (jpeg::read-dht descriptor i))
-	(jpeg:decode-stream is :buffer (frame chunk)
-			  :descriptor descriptor #+nil(jpeg-descriptor rec))))
+      (jpeg:decode-stream is :buffer (frame chunk)
+			  :descriptor (jpeg-descriptor rec)))
     (bt:release-lock cur-lock)))
 
 (defmethod initialize-instance :after ((s avi-mjpeg-stream) &key &allow-other-keys)
