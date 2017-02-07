@@ -137,12 +137,20 @@
   (read-sequence (frame (car (wcursor rec))) input-stream :end fsize))
 
 (defmethod decode-media-stream ((rec mjpeg-stream-record) fsize input-stream)
-  (bt:with-lock-held ((vacancy-lock (car (wcursor rec))))
+  (let* ((chunk (pop (wcursor rec)))
+	 (cur-lock (vacancy-lock chunk))
+	 (new-chunk (car (wcursor rec))))
+    (bt:acquire-lock (vacancy-lock new-chunk))
     (read-sequence (buffer rec) input-stream :end fsize)
     (flexi-streams:with-input-from-sequence (is (buffer rec))
-      (jpeg:decode-stream is :buffer (frame (car (wcursor rec)))
+      (jpeg:decode-stream is :buffer (frame chunk)
 			  :descriptor (jpeg-descriptor rec)))
-    (pop (wcursor rec))))
+    (bt:release-lock cur-lock)))
+
+(defmethod pop-chunk ((rec stream-record))
+  (bt:with-lock-held ((vacancy-lock (car (rcursor rec))))
+    (prog1 (car (rcursor rec))
+      (pop (rcursor rec)))))
 
 (defmethod initialize-instance :after ((s avi-mjpeg-stream) &key &allow-other-keys)
   (setf (chunk-decoder s) #'(lambda (stream id size)
@@ -201,6 +209,9 @@
 	     (loop repeat (nstreams avi) collecting (read-avi-stream-info avi stream)))
        (return)))
 
+(defmethod find-mjpeg-stream-record ((avi avi-mjpeg-stream))
+  (find-if #'(lambda (x) (eql (type-of x) 'mjpeg-stream-record)) (stream-records avi)))
+
 (defmethod decode ((avi avi-mjpeg-stream))
   (with-open-file (stream (filename avi) :direction :input :element-type '(unsigned-byte 8))
     ;; read AVI header first
@@ -211,6 +222,7 @@
 	(error 'unrecognized-file-format))
       (cond ((string-equal fourcc "avi ") (read-avi-header avi stream))
 	    (t (error 'unsupported-avi-file-format))))
+    (bt:acquire-lock (vacancy-lock (car (wcursor (find-mjpeg-stream-record avi))))) ;the player shouldn't start before 1st frame is decoded
     (when (player-callback avi)
       (funcall (player-callback avi) avi))
     (loop for chunk = (riff:read-riff-chunk stream :chunk-data-reader (chunk-decoder avi))
