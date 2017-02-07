@@ -20,3 +20,4 @@ Some sample files can be found [here](https://cinelerra-cv.org/footage.php) (the
 * AVI MJPEG chunk decoding [done]
 * Rudimentary video stream player [done]
 * Indexing support
+* Multicore frame decoding
