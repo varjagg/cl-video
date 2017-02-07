@@ -3,7 +3,7 @@
 (defmethod play-stream ((avi avi-mjpeg-stream))
   (bt:make-thread 
    #'(lambda ()
-       (with-slots (height width stream-records) avi
+       (with-slots (height width) avi
 	 (let* ((display (xlib:open-default-display))
 		(window (xlib:create-window :parent (xlib:screen-root (xlib:display-default-screen display))
 					    :x 0 :y 0 :width width :height height
@@ -14,7 +14,7 @@
 		(buffer (make-array `(,height ,width) :element-type 'xlib:pixel))
 		(image (xlib:create-image  :data buffer :depth 24
 					   :height height :width width))
-		(rec (find-if #'(lambda (x) (eql (type-of x) 'mjpeg-stream-record)) stream-records)))
+		(rec (find-mjpeg-stream-record avi)))
 	   (unwind-protect
 		(progn
 		  (setf (xlib:wm-name window) (pathname-name (filename avi)))
@@ -22,7 +22,7 @@
 		  (xlib:event-case (display :discard-p t)
 		    (exposure ()
 			      (loop for i from 0 below height
-				 with src = (frame (pop (rcursor rec))) do
+				 with src = (frame (pop-chunk rec)) do
 				   (loop for j from 0 below width
 				      for spos = (* 3 (+ j (* width i))) do
 					(setf (aref buffer i j)
