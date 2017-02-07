@@ -11,7 +11,7 @@
 		(gc (xlib:create-gcontext :drawable window))
 		(pixmap (xlib:create-pixmap :width width :height height :depth 24 :drawable window))
 		(pixmap-gc (xlib:create-gcontext :drawable pixmap))
-		(buffer (make-array `(,width ,height) :element-type 'xlib:pixel))
+		(buffer (make-array `(,height ,width) :element-type 'xlib:pixel))
 		(image (xlib:create-image  :data buffer :depth 24
 					   :height height :width width))
 		(rec (find-if #'(lambda (x) (eql (type-of x) 'mjpeg-stream-record)) stream-records)))
