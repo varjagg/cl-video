@@ -106,7 +106,7 @@
   (flexi-streams:with-input-from-sequence (is +avi-dht+)
     (jpeg::read-dht (jpeg-descriptor rec) is))
   (setf (buffer rec) (make-array (suggested-buffer-size rec) :element-type '(unsigned-byte 8))
-	(chunk-queue rec) (make-list (max 5 (floor (floor (rate rec) (scale rec)) 4)))) ;at least 5 chunks to prevent cursor deadlocks
+	(chunk-queue rec) (make-list (max 5 (* 8 (floor (rate rec) (scale rec)))))) ;at least 5 chunks to prevent cursor deadlocks
   (loop for chunk on (chunk-queue rec) do
        (setf (car chunk) (make-instance 'chunk :frame (jpeg:allocate-buffer (height (avi rec)) (width (avi rec)) 3))))
   (setf (cdr (last (chunk-queue rec))) (chunk-queue rec)
