@@ -48,6 +48,7 @@
 					    display
 					    (xlib:keycode->keysym display code 0))
 				       (#\q
+					(setf (finish avi) t)
 					(setf quit t))
 				       ((#\Space #\p)
 					(setf pause (not pause))))
