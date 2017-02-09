@@ -16,6 +16,7 @@
 					   :height height :width width))
 		(rec (find-mjpeg-stream-record avi))
 		(pause nil))
+	   (sleep (* (start rec) (/ (scale rec) (rate rec)))) ;stream delay, if any
 	   (unwind-protect
 		(progn
 		  (setf (xlib:wm-name window) (pathname-name (filename avi)))
