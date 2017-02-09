@@ -137,7 +137,8 @@
    (flags :accessor flags)
    (nstreams :accessor nstreams)
    (player-callback :accessor player-callback :initarg :player-callback :initform nil) ;;called once all headers are processed
-   (stream-records :accessor stream-records)))
+   (stream-records :accessor stream-records)
+   (finish :accessor finish :initform nil)))
 
 (defgeneric decode-media-stream (record fsize input-stream))
 
@@ -231,7 +232,7 @@
     (when (player-callback avi)
       (funcall (player-callback avi) avi))
     (loop for chunk = (riff:read-riff-chunk stream :chunk-data-reader (chunk-decoder avi))
-	 while chunk)
+       while (and chunk (not (finish avi))))
     (loop for rec in (stream-records avi) do 
 	 (setf (final rec) (car (wcursor rec)))
 	 (bt:release-lock (vacancy-lock (car (wcursor rec)))))))
