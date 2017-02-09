@@ -114,7 +114,14 @@
 	(wcursor rec) (cdr (chunk-queue rec))))
 
 (defclass audio-stream-record (stream-record)
-  ())
+  ((compression-code :accessor compression-code)
+   (number-of-channels :accessor number-of-channels)
+   (sample-rate :accessor sample-rate)
+   (average-bytes-per-second :accessor average-bytes-per-second)
+   (block-align :accessor block-align)
+   (significant-bits-per-sample :accessor significant-bits-per-sample)
+   (extra-format-bytes :accessor extra-format-bytes)
+   (extra-bytes :accessor extra-bytes)))
 
 (defmethod shared-initialize :after ((rec audio-stream-record) slots &key &allow-other-keys)
   (declare (ignorable slots))
@@ -125,6 +132,22 @@
   (setf (cdr (last (chunk-queue rec))) (chunk-queue rec)
 	(rcursor rec) (chunk-queue rec)
 	(wcursor rec) (cdr (chunk-queue rec))))
+
+(defmethod read-audio-stream-header ((rec audio-stream-record) stream)
+  (loop for chunk = (riff:read-riff-chunk stream)
+     when (string-equal (riff:riff-chunk-id chunk) "strf") do
+       (flexi-streams:with-input-from-sequence (is (riff:riff-chunk-data chunk))
+	(setf (compression-code rec) (riff:read-u2 is)
+	     (number-of-channels rec) (riff:read-u2 is)
+	     (sample-rate rec) (riff:read-u4 is)
+	     (average-bytes-per-second rec) (riff:read-u4 is)
+	     (block-align rec) (riff:read-u2 is)
+	     (significant-bits-per-sample rec) (riff:read-u2 is))
+       (unless (eql (compression-code rec) 1)
+	 (setf (extra-format-bytes rec) (riff:read-u2 is)
+	       (extra-bytes rec) (make-array (extra-format-bytes rec) :element-type (stream-element-type is)))
+	 (read-sequence (extra-bytes rec) is)))
+       (return)))
 
 (defclass video-stream ()
   ((filename :accessor filename :initarg :filename :initform nil)))
@@ -189,7 +212,7 @@
 	 (error 'unsupported-avi-file-format))
        (cond ((and (string-equal (fcc-type rec) "vids") (string-equal (fcc-handler rec) "mjpg"))
 	      (change-class rec 'mjpeg-stream-record))
-	     ((string-equal (fcc-type rec) "auds") (change-class rec 'audio-stream-record)))
+	     ((string-equal (fcc-type rec) "auds") (change-class rec 'audio-stream-record) (read-audio-stream-header rec stream)))
        (return-from read-avi-stream-info rec))
   (error 'malformed-avi-file-format))
 
