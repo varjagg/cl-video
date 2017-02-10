@@ -15,6 +15,7 @@
 		(image (xlib:create-image  :data buffer :depth 24
 					   :height height :width width))
 		(rec (find-mjpeg-stream-record avi))
+		(audio-rec (find-pcm-stream-record avi))
 		(pause nil))
 	   (sleep (* (start rec) (/ (scale rec) (rate rec)))) ;stream delay, if any
 	   (unwind-protect
