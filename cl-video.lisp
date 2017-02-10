@@ -9,6 +9,8 @@
 (eval-when (:compile-toplevel) 
   (defconstant +avif-must-use-index+ #x20) 
 
+  (defconstant  +pcmi-uncompressed+ 1)
+
   (defconstant +avi-dht+
     #(#x01 #xA2 
       #x00 #x00 #x01 #x05 #x01 #x01 #x01 #x01 #x01 #x01 #x00 #x00 #x00 #x00 #x00 
@@ -143,7 +145,7 @@
 	     (average-bytes-per-second rec) (riff:read-u4 is)
 	     (block-align rec) (riff:read-u2 is)
 	     (significant-bits-per-sample rec) (riff:read-u2 is))
-       (unless (eql (compression-code rec) 1)
+       (unless (eql (compression-code rec) +pcmi-uncompressed+)
 	 (setf (extra-format-bytes rec) (riff:read-u2 is)
 	       (extra-bytes rec) (make-array (extra-format-bytes rec) :element-type (stream-element-type is)))
 	 (read-sequence (extra-bytes rec) is)))
@@ -239,6 +241,10 @@
 
 (defmethod find-mjpeg-stream-record ((avi avi-mjpeg-stream))
   (find-if #'(lambda (x) (eql (type-of x) 'mjpeg-stream-record)) (stream-records avi)))
+
+(defmethod find-pcm-stream-record ((avi avi-mjpeg-stream))
+  (find-if #'(lambda (x) (and (eql (type-of x) 'audio-stream-record)
+			      (eql (compression-code x) +pcmi-uncompressed+))) (stream-records avi)))
 
 (defmethod decode ((avi avi-mjpeg-stream))
   (with-open-file (stream (filename avi) :direction :input :element-type '(unsigned-byte 8))
