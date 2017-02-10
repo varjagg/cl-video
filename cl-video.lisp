@@ -163,7 +163,9 @@
    (nstreams :accessor nstreams)
    (player-callback :accessor player-callback :initarg :player-callback :initform nil) ;;called once all headers are processed
    (stream-records :accessor stream-records)
-   (finish :accessor finish :initform nil)))
+   (finish :accessor finish :initform nil)
+   (pause :accessor pause :initform nil)
+   (pause-lock :accessor pause-lock :initform (bt:make-lock))))
 
 (defgeneric decode-media-stream (record fsize input-stream))
 
