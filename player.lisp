@@ -10,7 +10,7 @@
 	   (stream-playback-start audio-rec)
 	   (setf astream
 		 (portaudio:open-default-stream 0 (number-of-channels audio-rec) :float (coerce (sample-rate audio-rec) 'double-float)
-						(/ (rate audio-rec) (scale audio-rec))))
+						(/ (/ (rate audio-rec) (scale audio-rec)) (number-of-channels audio-rec))))
 	   (sleep (* (start audio-rec) (/ (scale audio-rec) (rate audio-rec))))
 	   (portaudio:start-stream astream)
 	   (unwind-protect
@@ -21,6 +21,7 @@
 		     (bt:acquire-lock (pause-lock avi))
 		   ;; send the audio frame
 		     (portaudio:write-stream astream src)
+		     #+mezzano(mezzano.driver.intel-hda::play-sound SAMPLE-VECTOR (first mezzano.driver.intel-hda::*cards*))
 		     (loop while (pause avi) do (sleep 0.2))
 		     (bt:release-lock (pause-lock avi))
 		   ;; advance the cursor lock

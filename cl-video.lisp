@@ -91,6 +91,7 @@
    (rcursor :accessor rcursor)
    (wcursor :accessor wcursor)
    (final :accessor final :initform nil)
+   (buffer :accessor buffer :type '(unsigned-byte 8))
    (avi :accessor avi :initarg :avi)))
 
 (defmethod stream-playback-start ((rec stream-record))
@@ -100,8 +101,7 @@
   (bt:release-lock (vacancy-lock (car (rcursor rec)))))
 
 (defclass mjpeg-stream-record (stream-record)
-  ((buffer :accessor buffer :type '(unsigned-byte 8))
-   (jpeg-descriptor :accessor jpeg-descriptor :initform (cl-jpeg::make-descriptor))))
+  ((jpeg-descriptor :accessor jpeg-descriptor :initform (cl-jpeg::make-descriptor))))
 
 (defmethod shared-initialize :after ((rec mjpeg-stream-record) slots &key &allow-other-keys)
   (declare (ignorable slots))
@@ -127,10 +127,11 @@
 
 (defmethod shared-initialize :after ((rec audio-stream-record) slots &key &allow-other-keys)
   (declare (ignorable slots))
-  (setf (chunk-queue rec) (make-list 16))
+  (setf  (buffer rec) (make-array (suggested-buffer-size rec) :element-type '(unsigned-byte 8))
+	 (chunk-queue rec) (make-list 16))
   (loop for chunk on (chunk-queue rec) do
        (setf (car chunk) (make-instance 'chunk :frame 
-					(make-array (suggested-buffer-size rec) :element-type '(unsigned-byte 8)))))
+					(make-array (suggested-buffer-size rec) :element-type 'float))))
   (setf (cdr (last (chunk-queue rec))) (chunk-queue rec)
 	(rcursor rec) (chunk-queue rec)
 	(wcursor rec) (cdr (chunk-queue rec))))
@@ -171,6 +172,24 @@
 
 (defmethod decode-media-stream ((rec stream-record) fsize input-stream)
   (read-sequence (frame (car (wcursor rec))) input-stream :end fsize))
+
+(defmethod decode-media-stream ((rec audio-stream-record) fsize input-stream)
+  (let* ((chunk (pop (wcursor rec)))
+	 (cur-lock (vacancy-lock chunk))
+	 (new-chunk (car (wcursor rec))))
+    (bt:acquire-lock (vacancy-lock new-chunk))
+    (read-sequence (buffer rec) input-stream :end fsize)
+    (flexi-streams:with-input-from-sequence (is (buffer rec))
+      (let ((sample-size (/ (block-align rec) (number-of-channels rec))))
+	(loop for i from 0 below fsize do
+	     (setf (aref (frame chunk) i) (if (= sample-size 1)
+					    (float (/ (- (read-byte is) 128) 128))
+					    (float (/ (let ((u2 (riff:read-u2 is)))
+							(if (> u2 32767)
+							    (- u2 65536)
+							    u2))
+						      32768)))))))
+    (bt:release-lock cur-lock)))
 
 (defmethod decode-media-stream ((rec mjpeg-stream-record) fsize input-stream)
   (let* ((chunk (pop (wcursor rec)))
