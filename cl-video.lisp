@@ -178,17 +178,7 @@
 	 (cur-lock (vacancy-lock chunk))
 	 (new-chunk (car (wcursor rec))))
     (bt:acquire-lock (vacancy-lock new-chunk))
-    (read-sequence (buffer rec) input-stream :end fsize)
-    (flexi-streams:with-input-from-sequence (is (buffer rec))
-      (let ((sample-size (/ (block-align rec) (number-of-channels rec))))
-	(loop for i from 0 below fsize do
-	     (setf (aref (frame chunk) i) (if (= sample-size 1)
-					    (float (/ (- (read-byte is) 128) 128))
-					    (float (/ (let ((u2 (riff:read-u2 is)))
-							(if (> u2 32767)
-							    (- u2 65536)
-							    u2))
-						      32768)))))))
+    (read-sequence (frame chunk) input-stream :end fsize)
     (bt:release-lock cur-lock)))
 
 (defmethod decode-media-stream ((rec mjpeg-stream-record) fsize input-stream)
