@@ -1,7 +1,34 @@
 (in-package :cl-video)
 
+;;; we speccialize own class & method to process the audio stream into floats as portaudio wants
+;;; but we still want to run decode in another thread to avoid the skips
+(defclass portaudio-pcm-stream-record (audio-stream-record)
+  ())
+
+(defmethod decode-media-stream ((rec portaudio-pcm-stream-record) fsize input-stream)
+  (let* ((chunk (pop (wcursor rec)))
+	 (cur-lock (vacancy-lock chunk))
+	 (new-chunk (car (wcursor rec))))
+    (bt:acquire-lock (vacancy-lock new-chunk))
+    (read-sequence (buffer rec) input-stream :end fsize)
+    (flexi-streams:with-input-from-sequence (is (buffer rec))
+      (let ((sample-size (/ (block-align rec) (number-of-channels rec))))
+	(loop for i from 0 below fsize do
+	     (setf (aref (frame chunk) i) (if (= sample-size 1)
+					    (float (/ (- (read-byte is) 128) 128))
+					    (float (/ (let ((u2 (riff:read-u2 is)))
+							(if (> u2 32767)
+							    (- u2 65536)
+							    u2))
+						      32768)))))))
+    (bt:release-lock cur-lock)))
+
+(defmethod find-portaudio-stream-record ((avi avi-mjpeg-stream))
+  (find-if #'(lambda (x) (and (eql (type-of x) 'portaudio-pcm-stream-record)
+			      (eql (compression-code x) +pcmi-uncompressed+))) (stream-records avi)))
+
 (defmethod play-audio-stream ((avi avi-mjpeg-stream))
-  (let ((audio-rec (find-pcm-stream-record avi))
+  (let ((audio-rec (find-portaudio-stream-record avi))
 	astream)
     (when audio-rec
       (bt:make-thread
@@ -95,4 +122,7 @@
 	   (xlib:close-display display)))))))
 
 (defun play (pathname)
-  (decode-file pathname :player-callback #'(lambda (avi) (play-audio-stream avi) (play-video-stream avi))))
+  (decode-file pathname :player-callback #'(lambda (avi)
+					     ;;has to use our specific decode for audio
+					     (change-class (find-pcm-stream-record avi) 'portaudio-pcm-stream-record) (sleep 2)
+					     (play-audio-stream avi) (play-video-stream avi))))
