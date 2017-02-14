@@ -6,6 +6,6 @@
 	   #:mjpeg-stream-record #:audio-stream-record
 	   #:stream-playback-start #:stream-playback-stop #:chunk
 	   #:media-decoder-error #:unrecognized-file-format #:unsupported-avi-file-format #:malformed-avi-file-format
-	   #:rcursor #:vacancy-lock #:scale #:rate #:filename #:final
-	   #:frame #:pause-lock #:vacancy-lock #:pause #:height #:width))
+	   #:rcursor #:vacancy-lock #:scale #:rate #:filename #:final #:finish
+	   #:frame #:pause-lock #:vacancy-lock #:pause #:height #:width #:start))
 
