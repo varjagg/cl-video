@@ -48,7 +48,6 @@
 		     (bt:acquire-lock (pause-lock avi))
 		   ;; send the audio frame
 		     (portaudio:write-stream astream src)
-		     #+mezzano(mezzano.driver.intel-hda::play-sound SAMPLE-VECTOR (first mezzano.driver.intel-hda::*cards*))
 		     (loop while (pause avi) do (sleep 0.2))
 		     (bt:release-lock (pause-lock avi))
 		   ;; advance the cursor lock
@@ -116,10 +115,10 @@
 					(bt:acquire-lock (pause-lock avi))
 					(bt:release-lock (pause-lock avi))))
 				     t))))
-	   (stream-playback-stop rec)
-	   (xlib:free-pixmap pixmap)
-	   (xlib:free-gcontext gc)
-	   (xlib:close-display display)))))))
+	     (stream-playback-stop rec)
+	     (xlib:free-pixmap pixmap)
+	     (xlib:free-gcontext gc)
+	     (xlib:close-display display)))))))
 
 (defun play (pathname)
   (decode-file pathname :player-callback #'(lambda (avi)
