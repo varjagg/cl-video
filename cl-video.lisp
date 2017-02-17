@@ -68,7 +68,7 @@
 	     (format stream "Malformed AVI file format"))))
 
 (defclass chunk ()
-  ((lock :reader vacancy-lock :initform (bt:make-lock))
+  ((lock :reader vacancy-lock :initform (bt:make-lock "vacancy"))
    (frame :accessor frame :initarg :frame)))
 
 (defclass stream-record ()
@@ -168,7 +168,7 @@
    (stream-records :accessor stream-records)
    (finish :accessor finish :initform nil)
    (pause :accessor pause :initform nil)
-   (pause-lock :accessor pause-lock :initform (bt:make-lock))))
+   (pause-lock :accessor pause-lock :initform (bt:make-lock "pause"))))
 
 (defgeneric decode-media-stream (record fsize input-stream))
 
