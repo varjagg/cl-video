@@ -58,7 +58,8 @@
 		     (sleep (/ (scale audio-rec) (rate audio-rec))))
 	     (portaudio:close-stream astream)
 	     (stream-playback-stop audio-rec)
-	     (portaudio:terminate)))))))
+	     (portaudio:terminate)))
+       :name "Audio stream playback"))))
     
 (defmethod play-video-stream ((avi avi-mjpeg-stream))
   (bt:make-thread 
@@ -118,7 +119,8 @@
 	     (stream-playback-stop rec)
 	     (xlib:free-pixmap pixmap)
 	     (xlib:free-gcontext gc)
-	     (xlib:close-display display)))))))
+	     (xlib:close-display display)))))
+   :name "Video stream playback"))
 
 (defun play (pathname)
   (decode-file pathname :player-callback #'(lambda (avi)
