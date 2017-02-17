@@ -82,9 +82,9 @@
 		  (setf (xlib:wm-name window) (pathname-name (filename avi)))
 		  (xlib:map-window window)
 		  (stream-playback-start rec)
-		  (loop for cur = (if (pause avi) cur (pop (rcursor rec)))
-		     for src = (frame cur)
-		     with quit = nil until quit do
+		  (loop with quit = nil until quit
+		     for cur = (if (pause avi) cur (pop (rcursor rec)))
+		     for src = (frame cur) do
 		       (loop for i from 0 below height do
 			    (loop for j from 0 below width
 			       for spos = (* 3 (+ j (* width i))) do
