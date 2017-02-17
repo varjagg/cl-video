@@ -4,7 +4,7 @@ Simple AVI/MJPEG video decoder written in Common Lisp. Leverages [CL-JPEG](https
 
 A primitive CLX media player is included.
 
-Has only been lightly tested on SBCL 13.x/Linux x86-64.
+Has only been lightly tested on SBCL 13.x/Linux x86-64. CL-JPEG version 2.8 or higher is required.
 
 Some sample files can be found [here](https://cinelerra-cv.org/footage.php) (the toy plane AVI) and [here](http://jjc.freeshell.org/turning_pages.html).
 
