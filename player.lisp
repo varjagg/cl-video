@@ -123,5 +123,6 @@
 (defun play (pathname)
   (decode-file pathname :player-callback #'(lambda (avi)
 					     ;;has to use our specific decode for audio
-					     (change-class (find-pcm-stream-record avi) 'portaudio-pcm-stream-record)
+					     (let ((a (find-pcm-stream-record avi)))
+					       (when a (change-class a 'portaudio-pcm-stream-record)))
 					     (play-audio-stream avi) (play-video-stream avi))))
