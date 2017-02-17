@@ -106,8 +106,10 @@
 (defmethod shared-initialize :after ((rec mjpeg-stream-record) slots &key &allow-other-keys)
   (declare (ignorable slots))
   (flexi-streams:with-input-from-sequence (is +avi-dht+)
-    (jpeg::read-dht (jpeg-descriptor rec) is))
+    (setf (jpeg::descriptor-byte-reader (jpeg-descriptor rec)) #'(lambda () (read-byte is)))
+    (jpeg:read-dht (jpeg-descriptor rec)))
   (setf (buffer rec) (make-array (suggested-buffer-size rec) :element-type '(unsigned-byte 8))
+	(jpeg:descriptor-source-cache (jpeg-descriptor rec)) (buffer rec)
 	(chunk-queue rec) (make-list (max 5 (* 1 (floor (rate rec) (scale rec)))))) ;at least 5 chunks to prevent cursor deadlocks
   (loop for chunk on (chunk-queue rec) do
        (setf (car chunk) (make-instance 'chunk :frame (jpeg:allocate-buffer (height (avi rec)) (width (avi rec)) 3))))
@@ -186,10 +188,10 @@
 	 (cur-lock (vacancy-lock chunk))
 	 (new-chunk (car (wcursor rec))))
     (bt:acquire-lock (vacancy-lock new-chunk))
-    (read-sequence (buffer rec) input-stream :end fsize)
-    (flexi-streams:with-input-from-sequence (is (buffer rec))
-      (jpeg:decode-stream is :buffer (frame chunk)
-			  :descriptor (jpeg-descriptor rec)))
+    (read-sequence (jpeg:descriptor-source-cache (jpeg-descriptor rec)) input-stream :end fsize)
+    (jpeg:decode-stream nil :buffer (frame chunk)
+			:descriptor (jpeg-descriptor rec)
+			:cached-source-p t)
     (bt:release-lock cur-lock)))
 
 (defmethod initialize-instance :after ((s avi-mjpeg-stream) &key &allow-other-keys)
