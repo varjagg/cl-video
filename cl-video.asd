@@ -5,7 +5,7 @@
   :author "Eugene Zaikonnikov"
   :license "BSD"
   :version "1.2"
-  :depends-on (#:cl-riff #:cl-jpeg #:bordeaux-threads #:flexi-streams)
+  :depends-on (#:alexandria #:cl-riff #:cl-jpeg #:bordeaux-threads #:flexi-streams)
   :serial t
   :components ((:file "package")
                (:file "cl-video")))
