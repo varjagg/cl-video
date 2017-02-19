@@ -6,12 +6,11 @@
 
 (setf *print-circle* t)
 
-(eval-when (:compile-toplevel) 
-  (defconstant +avif-must-use-index+ #x20) 
+(define-constant +avif-must-use-index+ #x20) 
 
-  (defconstant  +pcmi-uncompressed+ 1)
+(define-constant  +pcmi-uncompressed+ 1)
 
-  (defconstant +avi-dht+
+(define-constant +avi-dht+
     #(#x01 #xA2 
       #x00 #x00 #x01 #x05 #x01 #x01 #x01 #x01 #x01 #x01 #x00 #x00 #x00 #x00 #x00 
       #x00 #x00 #x00 #x01 #x02 #x03 #x04 #x05 #x06 #x07 #x08 #x09 #x0A #x0B #x01 
@@ -44,7 +43,8 @@
       #x99 #x9A #xA2 #xA3 #xA4 #xA5 #xA6 #xA7 #xA8 #xA9 #xAA #xB2 #xB3 #xB4 #xB5 
       #xB6 #xB7 #xB8 #xB9 #xBA #xC2 #xC3 #xC4 #xC5 #xC6 #xC7 #xC8 #xC9 #xCA #xD2 
       #xD3 #xD4 #xD5 #xD6 #xD7 #xD8 #xD9 #xDA #xE2 #xE3 #xE4 #xE5 #xE6 #xE7 #xE8 
-      #xE9 #xEA #xF2 #xF3 #xF4 #xF5 #xF6 #xF7 #xF8 #xF9 #xFA)))
+      #xE9 #xEA #xF2 #xF3 #xF4 #xF5 #xF6 #xF7 #xF8 #xF9 #xFA)
+  :test #'equalp)
 
 (define-condition media-decoder-error (error)
   ())
