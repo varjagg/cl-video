@@ -1,7 +1,7 @@
 ;;;; package.lisp
 
 (defpackage #:cl-video
-  (:use #:cl)
+  (:use #:cl #:alexandria)
   (:export #:decode-file #:decode #:find-mjpeg-stream-record #:find-pcm-stream-record #:avi-mjpeg-stream
 	   #:mjpeg-stream-record #:audio-stream-record
 	   #:stream-playback-start #:stream-playback-stop #:chunk
