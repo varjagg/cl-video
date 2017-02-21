@@ -46,6 +46,13 @@
       #xE9 #xEA #xF2 #xF3 #xF4 #xF5 #xF6 #xF7 #xF8 #xF9 #xFA)
   :test #'equalp)
 
+(defvar *debug* nil)
+
+(defun debug-log (string)
+  (when *debug*
+    (print string)
+    (finish-output)))
+
 (define-condition media-decoder-error (error)
   ())
 
@@ -240,7 +247,7 @@
 	 (setf (padding avi) (riff:read-u4 is)
 	       (flags avi) (riff:read-u4 is))
 	 (unless (zerop (logand (flags avi) +avif-must-use-index+))
-	   (format t "CL-VIDEO WARNING: must use index flag is set, frame order is possibly incorrect~%"))
+	   (debug-log (format nil "CL-VIDEO WARNING: must use index flag is set, frame order is possibly incorrect~%")))
 	 (riff:read-u4 is)   ;;dwTotalFrames
 	 (riff:read-u4 is)   ;;dwInitialFrames
 	 (setf (nstreams avi) (riff:read-u4 is))
