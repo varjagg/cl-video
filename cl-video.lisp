@@ -50,7 +50,7 @@
 
 (defun debug-log (string)
   (when *debug*
-    (print string)
+    (format t "~A~%" string)
     (finish-output)))
 
 (define-condition media-decoder-error (error)
@@ -155,6 +155,7 @@
 	     (average-bytes-per-second rec) (riff:read-u4 is)
 	     (block-align rec) (riff:read-u2 is)
 	     (significant-bits-per-sample rec) (riff:read-u2 is))
+	(debug-log (format nil "Audio stream with sample rate ~D at ~D bits per sample" (sample-rate rec) (significant-bits-per-sample rec)))
        (unless (eql (compression-code rec) +pcmi-uncompressed+)
 	 (setf (extra-format-bytes rec) (riff:read-u2 is)
 	       (extra-bytes rec) (make-array (extra-format-bytes rec) :element-type (stream-element-type is)))
