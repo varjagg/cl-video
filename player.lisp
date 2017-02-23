@@ -23,6 +23,11 @@
 						      32768)))))))
     (bt:release-lock cur-lock)))
 
+(defmethod shared-initialize :after ((rec portaudio-pcm-stream-record) slots &key &allow-other-keys)
+  (declare (ignorable slots))
+  (setf  (buffer rec) (make-array (suggested-buffer-size rec) :element-type '(unsigned-byte 8)))
+  (initialize-ring rec 16 (suggested-buffer-size rec) 'float))
+
 (defmethod find-portaudio-stream-record ((avi avi-mjpeg-stream))
   (find-if #'(lambda (x) (and (eql (type-of x) 'portaudio-pcm-stream-record)
 			      (eql (compression-code x) +pcmi-uncompressed+))) (stream-records avi)))
@@ -123,8 +128,10 @@
    :name "Video stream playback"))
 
 (defun play (pathname)
-  (decode-file pathname :player-callback #'(lambda (avi)
-					     ;;has to use our specific decode for audio
-					     (let ((a (find-pcm-stream-record avi)))
-					       (when a (change-class a 'portaudio-pcm-stream-record)))
-					     (play-audio-stream avi) (play-video-stream avi))))
+  (decode-file pathname :player-callback
+	       #'(lambda (avi)
+		   ;;has to use our specific decode for audio
+		   (let ((a (find-pcm-stream-record avi)))
+		     (when a (change-class a 'portaudio-pcm-stream-record)))
+		   (prime-all-streams avi)
+		   (play-audio-stream avi) (play-video-stream avi))))
