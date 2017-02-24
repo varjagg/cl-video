@@ -41,9 +41,9 @@
 	   (sleep (* (start audio-rec) (/ (scale audio-rec) (rate audio-rec))))
 	   (portaudio:start-stream astream)
 	   (unwind-protect
-		(loop for cur = (if (pause avi) cur (pop (rcursor audio-rec)))
-		   for src = (frame cur)
-		   until (finish avi) do
+		(loop until (finish avi)
+		   for cur = (if (pause avi) cur (pop (rcursor audio-rec)))
+		   for src = (frame cur) do
 		   ;; pause synching protocol w/video stream
 		     (bt:acquire-lock (pause-lock avi))
 		   ;; send the audio frame
