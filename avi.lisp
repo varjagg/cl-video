@@ -151,7 +151,7 @@
 
 (defmethod read-avi-stream-info ((avi avi-mjpeg-container) stream)
   (loop for chunk = (riff:read-riff-chunk stream)
-     with rec = (make-instance 'stream-record :avi avi)
+     with rec = (make-instance 'stream-record :container avi)
      when (string-equal (riff:riff-chunk-id chunk) "strh") do
        (flexi-streams:with-input-from-sequence (is (riff:riff-chunk-data chunk))
 	 (setf (fcc-type rec) (riff::read-fourcc is)
@@ -218,10 +218,6 @@
     (loop for rec in (stream-records avi) do 
 	 (setf (final rec) (car (wcursor rec)))
 	 (bt:release-lock (vacancy-lock (car (wcursor rec)))))))
-
-(defun decode-file (pathname &key player-callback)
-  (let ((container (make-instance 'avi-mjpeg-container :filename pathname :player-callback player-callback)))
-    (decode container)))
 
 (defun show-file-chunks (pathname)
   (with-open-file (stream pathname :direction :input :element-type '(unsigned-byte 8))
