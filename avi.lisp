@@ -171,8 +171,9 @@
        (when (and (string-equal (fcc-type rec) "vids") (not (member (fcc-handler rec) '("mjpg") :test #'string-equal)))
 	 (error 'unsupported-avi-file-format))
        (cond ((and (string-equal (fcc-type rec) "vids") (string-equal (fcc-handler rec) "mjpg"))
-	      (change-class rec 'mjpeg-stream-record))
-	     ((string-equal (fcc-type rec) "auds") (change-class rec 'audio-stream-record) (read-audio-stream-header rec stream)))
+	      (change-class rec 'mjpeg-stream-record) (setf (frame-delay rec) (/ (scale rec) (rate rec))))
+	     ((string-equal (fcc-type rec) "auds")
+	      (change-class rec 'audio-stream-record) (read-audio-stream-header rec stream) (setf (frame-delay rec) (/ (scale rec) (rate rec)))))
        (return-from read-avi-stream-info rec))
   (error 'malformed-avi-file-format))
 
