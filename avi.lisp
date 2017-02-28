@@ -72,7 +72,7 @@
 (defclass mjpeg-stream-record (avi-stream-record video-stream-record)
   ((jpeg-descriptor :accessor jpeg-descriptor :initform (cl-jpeg::make-descriptor))))
 
-(defmethod stream-playback-start ((rec mjpeg-stream-record))
+(defmethod stream-playback-start ((rec avi-stream-record))
   (sleep (* (start rec) (/ (scale rec) (rate rec)))) ;stream delay, if any
   (call-next-method))
 
