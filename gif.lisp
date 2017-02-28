@@ -30,8 +30,8 @@
 (defmethod decode ((container gif-container))
   (with-open-file (stream (filename container) :direction :input :element-type '(unsigned-byte 8))
     
-    (let ((data-stream (skippy:read-data-stream stream))
-	  )
+    (let ((data-stream (skippy:read-data-stream stream)))
+      (loop for image in (skippy:images data-stream))
       (unless (string-equal id "riff")
 	(error 'unrecognized-file-format))
       )
@@ -41,7 +41,3 @@
     (loop for rec in (stream-records container) do 
 	 (setf (final rec) (car (wcursor rec)))
 	 (bt:release-lock (vacancy-lock (car (wcursor rec)))))))
-
-(defun decode-file (pathname &key player-callback)
-  (let ((gif-container (make-instance 'gif-container :filename pathname :player-callback player-callback)))
-    (decode gif-container)))
