@@ -32,6 +32,7 @@
    (wcursor :accessor wcursor)
    (final :accessor final :initform nil)
    (buffer :accessor buffer :type '(unsigned-byte 8))
+   (frame-delay :accessor frame-delay :initarg :frame-delay)
    (container :accessor container :initarg :container)))
 
 (defmethod initialize-ring ((rec stream-record) ring-length frame-size element-type)
@@ -42,6 +43,10 @@
 	(rcursor rec) (chunk-queue rec)
 	(wcursor rec) (cdr (chunk-queue rec))))
 
+(defgeneric stream-playback-start (stream-record))
+
+(defgeneric stream-playback-stop (stream-record))
+
 (defmethod stream-playback-start ((rec stream-record))
   (bt:acquire-lock (vacancy-lock (car (rcursor rec)))))
 
@@ -49,7 +54,7 @@
   (bt:release-lock (vacancy-lock (car (rcursor rec)))))
 
 (defclass video-stream-record (stream-record)
-  (frame-delay :accessor frame-delay :initarg :frame-delay))
+  ())
 
 (defclass av-container ()
   ((filename :accessor filename :initarg :filename :initform nil)
