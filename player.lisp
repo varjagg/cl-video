@@ -43,7 +43,6 @@
 	   (setf astream
 		 (portaudio:open-default-stream 0 (number-of-channels audio-rec) :float (coerce (sample-rate audio-rec) 'double-float)
 						(/ (/ (rate audio-rec) (scale audio-rec)) (number-of-channels audio-rec))))
-	   (sleep (* (start audio-rec) (/ (scale audio-rec) (rate audio-rec))))
 	   (portaudio:start-stream astream)
 	   (unwind-protect
 		(loop until (finish container)
