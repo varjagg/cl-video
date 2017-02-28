@@ -13,7 +13,9 @@
 (defmethod decode ((container gif-container))
   (with-open-file (stream (filename container) :direction :input :element-type '(unsigned-byte 8))
     (let* ((data-stream (skippy:read-data-stream stream))
-	   (rec (make-instance 'gif-stream-record :container container :frame-delay (/ (skippy:delay-time data-stream) 100))))
+	   (rec (make-instance 'gif-stream-record
+			       :container container
+			       :frame-delay (/ (skippy:delay-time (aref (skippy:images data-stream) 0)) 100))))
       (with-slots (height width) container
 	  (setf height (skippy:height data-stream)
 		width (skippy:width data-stream)
@@ -21,9 +23,10 @@
  		(loopingp container) (skippy:loopingp data-stream))
 	  (initialize-ring rec (number-of-frames container)
 			   (* height width 3) '(unsigned-byte 8))
-	  (loop for image in (skippy:images data-stream)
+	  (loop for image across (skippy:images data-stream)
 	     for cur = (pop (wcursor rec))
 	     for frame = (frame cur) do
+	       (debug-log (format nil "~D ~D~%" (skippy:height image) (skippy:width image)))
 	       (loop for y from 0 below height do
 		    (loop for x from 0 below width
 		       for pos = (* 3 (+ x (* width y))) do
