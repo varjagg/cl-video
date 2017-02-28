@@ -6,38 +6,34 @@
 (defclass gif-stream-record (video-stream-record)
   ())
 
-(defmethod shared-initialize :after ((rec gif-stream-record) slots &key &allow-other-keys)
-  (declare (ignorable slots))
-  (setf (buffer rec) (make-array (suggested-buffer-size rec) :element-type '(unsigned-byte 8))
-	(jpeg:descriptor-source-cache (jpeg-descriptor rec)) (buffer rec))
-  (initialize-ring rec (max 5 (* 1 (floor (rate rec) (scale rec)))) ;at least 5 chunks to prevent cursor deadlocks
-		   (* (height (container rec)) (width (container rec)) 3) 'cl-jpeg::uint8))
-
 (defclass gif-container (av-container)
-  ((loopingp :accessor loopingp :initform nil)))
-
-(defmethod decode-media-stream ((rec gif-stream-record) fsize input-stream)
-  (let* ((chunk (pop (wcursor rec)))
-	 (cur-lock (vacancy-lock chunk))
-	 (new-chunk (car (wcursor rec))))
-    (bt:acquire-lock (vacancy-lock new-chunk))
-    (read-sequence (jpeg:descriptor-source-cache (jpeg-descriptor rec)) input-stream :end fsize)
-    (jpeg:decode-stream nil :buffer (frame chunk)
-			:descriptor (jpeg-descriptor rec)
-			:cached-source-p t)
-    (bt:release-lock cur-lock)))
+  ((number-of-frames :accessor number-of-frames)
+   (loopingp :accessor loopingp :initform nil)))
 
 (defmethod decode ((container gif-container))
   (with-open-file (stream (filename container) :direction :input :element-type '(unsigned-byte 8))
-    
-    (let ((data-stream (skippy:read-data-stream stream)))
-      (loop for image in (skippy:images data-stream))
-      (unless (string-equal id "riff")
-	(error 'unrecognized-file-format))
-      )
-    (when (player-callback container)
-      (funcall (player-callback container) container))
-    
-    (loop for rec in (stream-records container) do 
-	 (setf (final rec) (car (wcursor rec)))
-	 (bt:release-lock (vacancy-lock (car (wcursor rec)))))))
+    (let* ((data-stream (skippy:read-data-stream stream))
+	   (rec (make-instance 'gif-stream-record :container container :frame-delay (/ (skippy:delay-time data-stream) 100))))
+      (with-slots (height width) container
+	  (setf height (skippy:height data-stream)
+		width (skippy:width data-stream)
+		(number-of-frames container) (length (skippy:images data-stream))
+ 		(loopingp container) (skippy:loopingp data-stream))
+	  (initialize-ring rec (number-of-frames container)
+			   (* height width 3) '(unsigned-byte 8))
+	  (loop for image in (skippy:images data-stream)
+	     for cur = (pop (wcursor rec))
+	     for frame = (frame cur) do
+	       (loop for y from 0 below height do
+		    (loop for x from 0 below width
+		       for pos = (* 3 (+ x (* width y))) do
+			 (multiple-value-bind (r g b)
+			     (skippy:color-rgb (skippy:color-table-entry (skippy:color-table data-stream) (skippy:pixel-ref image x y)))
+			   (setf (aref frame pos) b
+				 (aref frame (1+ pos)) g
+				 (aref frame (+ pos 2)) r))))))
+      (unless (loopingp container)
+	(setf (final rec) (car (wcursor rec))))
+      (when (player-callback container)
+	(funcall (player-callback container) container))
+      (bt:release-lock (vacancy-lock (car (wcursor rec)))))))
