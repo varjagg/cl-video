@@ -84,7 +84,7 @@
   (setf (buffer rec) (make-array (suggested-buffer-size rec) :element-type '(unsigned-byte 8))
 	(jpeg:descriptor-source-cache (jpeg-descriptor rec)) (buffer rec))
   (initialize-ring rec (max 5 (* 1 (floor (rate rec) (scale rec)))) ;at least 5 chunks to prevent cursor deadlocks
-		   (* (height (avi rec)) (width (avi rec)) 3) 'cl-jpeg::uint8))
+		   (* (height (container rec)) (width (container rec)) 3) 'cl-jpeg::uint8))
 
 (defclass audio-stream-record (avi-stream-record)
   ((compression-code :accessor compression-code)
@@ -151,7 +151,7 @@
 
 (defmethod read-avi-stream-info ((avi avi-mjpeg-container) stream)
   (loop for chunk = (riff:read-riff-chunk stream)
-     with rec = (make-instance 'stream-record :container avi)
+     with rec = (make-instance 'avi-stream-record :container avi)
      when (string-equal (riff:riff-chunk-id chunk) "strh") do
        (flexi-streams:with-input-from-sequence (is (riff:riff-chunk-data chunk))
 	 (setf (fcc-type rec) (riff::read-fourcc is)
