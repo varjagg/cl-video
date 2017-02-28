@@ -28,7 +28,7 @@
   (setf  (buffer rec) (make-array (suggested-buffer-size rec) :element-type '(unsigned-byte 8)))
   (initialize-ring rec 16 (suggested-buffer-size rec) 'float))
 
-(defmethod find-portaudio-stream-record ((container avi-mjpeg-stream))
+(defmethod find-portaudio-stream-record ((container av-container))
   (find-if #'(lambda (x) (and (eql (type-of x) 'portaudio-pcm-stream-record)
 			      (eql (compression-code x) +pcmi-uncompressed+))) (stream-records container)))
 
@@ -125,6 +125,12 @@
 	     (xlib:free-gcontext gc)
 	     (xlib:close-display display)))))
    :name "Video stream playback"))
+
+(defun decode-file (pathname &key player-callback)
+  (let ((container (make-instance (cond  ((string-equal "avi" (pathname-type pathname)) 'avi-mjpeg-container)
+					 ((string-equal "gif" (pathname-type pathname)) 'gif-container)
+					 (t (error 'unrecognized-file-format))) :filename pathname :player-callback player-callback)))
+    (decode container)))
 
 (defun play (pathname)
   (decode-file pathname :player-callback
