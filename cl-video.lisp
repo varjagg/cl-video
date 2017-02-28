@@ -49,7 +49,7 @@
   (bt:release-lock (vacancy-lock (car (rcursor rec)))))
 
 (defclass video-stream-record (stream-record)
-  ())
+  (frame-delay :accessor frame-delay :initarg :frame-delay))
 
 (defclass av-container ()
   ((filename :accessor filename :initarg :filename :initform nil)
