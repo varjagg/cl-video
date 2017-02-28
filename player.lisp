@@ -28,12 +28,12 @@
   (setf  (buffer rec) (make-array (suggested-buffer-size rec) :element-type '(unsigned-byte 8)))
   (initialize-ring rec 16 (suggested-buffer-size rec) 'float))
 
-(defmethod find-portaudio-stream-record ((avi avi-mjpeg-stream))
+(defmethod find-portaudio-stream-record ((container avi-mjpeg-stream))
   (find-if #'(lambda (x) (and (eql (type-of x) 'portaudio-pcm-stream-record)
-			      (eql (compression-code x) +pcmi-uncompressed+))) (stream-records avi)))
+			      (eql (compression-code x) +pcmi-uncompressed+))) (stream-records container)))
 
-(defmethod play-audio-stream ((avi avi-mjpeg-stream))
-  (let ((audio-rec (find-portaudio-stream-record avi))
+(defmethod play-audio-stream ((container av-container))
+  (let ((audio-rec (find-portaudio-stream-record container))
 	astream)
     (when audio-rec
       (bt:make-thread
@@ -46,15 +46,15 @@
 	   (sleep (* (start audio-rec) (/ (scale audio-rec) (rate audio-rec))))
 	   (portaudio:start-stream astream)
 	   (unwind-protect
-		(loop until (finish avi)
-		   for cur = (if (pause avi) cur (pop (rcursor audio-rec)))
+		(loop until (finish container)
+		   for cur = (if (pause container) cur (pop (rcursor audio-rec)))
 		   for src = (frame cur) do
 		   ;; pause synching protocol w/video stream
-		     (bt:acquire-lock (pause-lock avi))
+		     (bt:acquire-lock (pause-lock container))
 		   ;; send the audio frame
 		     (portaudio:write-stream astream src)
-		     (loop while (pause avi) do (sleep 0.2))
-		     (bt:release-lock (pause-lock avi))
+		     (loop while (pause container) do (sleep 0.2))
+		     (bt:release-lock (pause-lock container))
 		   ;; advance the cursor lock
 		     (bt:acquire-lock (vacancy-lock (car (rcursor audio-rec))))
 		     (bt:release-lock (vacancy-lock cur))
@@ -66,10 +66,10 @@
 	     (portaudio:terminate)))
        :name "Audio stream playback"))))
     
-(defmethod play-video-stream ((avi avi-mjpeg-stream))
+(defmethod play-video-stream ((container av-container))
   (bt:make-thread 
    #'(lambda ()
-       (with-slots (height width) avi
+       (with-slots (height width) container
 	 (let* ((display (xlib:open-default-display))
 		(window (xlib:create-window :parent (xlib:screen-root (xlib:display-default-screen display))
 					    :x 0 :y 0 :width width :height height
@@ -80,15 +80,14 @@
 		(buffer (make-array `(,height ,width) :element-type 'xlib:pixel))
 		(image (xlib:create-image  :data buffer :depth 24
 					   :height height :width width))
-		(rec (find-mjpeg-stream-record avi)))
-	   (sleep (* (start rec) (/ (scale rec) (rate rec)))) ;stream delay, if any
+		(rec (find-video-stream-record container)))
 	   (unwind-protect
 		(progn
-		  (setf (xlib:wm-name window) (pathname-name (filename avi)))
+		  (setf (xlib:wm-name window) (pathname-name (filename container)))
 		  (xlib:map-window window)
 		  (stream-playback-start rec)
 		  (loop with quit = nil until quit
-		     for cur = (if (pause avi) cur (pop (rcursor rec)))
+		     for cur = (if (pause container) cur (pop (rcursor rec)))
 		     for src = (frame cur) do
 		       (loop for i from 0 below height do
 			    (loop for j from 0 below width
@@ -98,7 +97,7 @@
 		       (xlib:put-image pixmap pixmap-gc image :width width :height height :x 0 :y 0)
 		       (xlib:copy-area pixmap gc 0 0 width height window 0 0)
 		       (xlib:display-force-output display)
-		       (unless (pause avi)
+		       (unless (pause container)
 			 (bt:acquire-lock (vacancy-lock (car (rcursor rec))))
 			 (bt:release-lock (vacancy-lock cur)))
 		       (when (eql cur (final rec))
@@ -114,12 +113,12 @@
 					    display
 					    (xlib:keycode->keysym display code 0))
 				       (#\q
-					(setf (finish avi) t)
+					(setf (finish container) t)
 					(setf quit t))
 				       ((#\Space #\p)
-					(setf (pause avi) (not (pause avi)))
-					(bt:acquire-lock (pause-lock avi))
-					(bt:release-lock (pause-lock avi))))
+					(setf (pause container) (not (pause container)))
+					(bt:acquire-lock (pause-lock container))
+					(bt:release-lock (pause-lock container))))
 				     t))))
 	     (stream-playback-stop rec)
 	     (xlib:free-pixmap pixmap)
@@ -129,9 +128,9 @@
 
 (defun play (pathname)
   (decode-file pathname :player-callback
-	       #'(lambda (avi)
+	       #'(lambda (video)
 		   ;;has to use our specific decode for audio
-		   (let ((a (find-pcm-stream-record avi)))
+		   (let ((a (find-pcm-stream-record video)))
 		     (when a (change-class a 'portaudio-pcm-stream-record)))
-		   (prime-all-streams avi)
-		   (play-audio-stream avi) (play-video-stream avi))))
+		   (prime-all-streams video)
+		   (play-audio-stream video) (play-video-stream video))))
