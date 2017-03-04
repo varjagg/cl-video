@@ -32,13 +32,15 @@
    (wcursor :accessor wcursor)
    (final :accessor final :initform nil)
    (buffer :accessor buffer :type '(unsigned-byte 8))
-   (frame-delay :accessor frame-delay :initarg :frame-delay)
    (container :accessor container :initarg :container)))
 
-(defmethod initialize-ring ((rec stream-record) ring-length frame-size element-type)
+(defgeneric frame-delay (record))
+
+(defmethod initialize-ring ((rec stream-record) ring-length &optional frame-size (element-type '(unsigned-byte 8)))
   (setf (chunk-queue rec) (make-list ring-length))
-  (loop for chunk on (chunk-queue rec) do
-       (setf (car chunk) (make-instance 'chunk :frame (make-array frame-size :element-type element-type))))
+    (when frame-size
+      (loop for chunk on (chunk-queue rec) do
+	   (setf (car chunk) (make-instance 'chunk :frame (make-array frame-size :element-type element-type)))))
   (setf (cdr (last (chunk-queue rec))) (chunk-queue rec)
 	(rcursor rec) (chunk-queue rec)
 	(wcursor rec) (cdr (chunk-queue rec))))
