@@ -27,8 +27,7 @@
   (with-open-file (stream (filename container) :direction :input :element-type '(unsigned-byte 8))
     (let* ((data-stream (skippy:read-data-stream stream))
 	   (rec (make-instance 'gif-stream-record
-			       :container container
-			       :frame-delay (/ skippy:*default-delay-time* 100))))
+			       :container container)))
       (with-slots (height width) container
 	  (setf height (skippy:height data-stream)
 		width (skippy:width data-stream)
@@ -38,10 +37,12 @@
 	  (loop for image across (skippy:images data-stream)
 	     for curpos = (wcursor rec)
 	     for frame = (make-array (* height width 3) :element-type '(unsigned-byte 8)) then (copy-array frame) do
+	       (unless (eql :none (skippy:disposal-method image)) (debug-log (format nil "disposal: ~A" (skippy:disposal-method image))))
 	       (setf (car curpos) (make-instance 'gif-chunk :frame frame :delay (/ (skippy:delay-time image) 100)))
-	       (loop for y from (skippy:top-position image) below (skippy:height image) do
-		    (loop for x from (skippy:left-position image) below (skippy:width image)
-		       for pos = (* 3 (+ x (* width y))) do
+	       (loop for y from 0 below (skippy:height image)
+		  for rowpos from (skippy:top-position image) do
+		    (loop for x from 0 below (skippy:width image)
+		       for pos = (* 3 (+ x (skippy:left-position image) (* width rowpos))) do
 			 (multiple-value-bind (r g b)
 			     (skippy:color-rgb (skippy:color-table-entry (skippy:color-table data-stream) (skippy:pixel-ref image x y)))
 			   (setf (aref frame pos) b
