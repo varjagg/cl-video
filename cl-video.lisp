@@ -45,6 +45,9 @@
 	(rcursor rec) (chunk-queue rec)
 	(wcursor rec) (cdr (chunk-queue rec))))
 
+(defmethod pop-chunk-rcursor ((rec stream-record))
+  (pop (rcursor rec)))
+
 (defgeneric stream-playback-start (stream-record))
 
 (defgeneric stream-playback-stop (stream-record))
@@ -63,7 +66,7 @@
    (player-callback :accessor player-callback :initarg :player-callback :initform nil) ;;called once all headers are processed
    (width :accessor width :initarg :width :initform 640)
    (height :accessor height :initarg :height :initform 480)
-   (stream-records :accessor stream-records)
+   (stream-records :accessor stream-records :initform '())
    (finish :accessor finish :initform nil)
    (pause :accessor pause :initform nil)
    (pause-lock :accessor pause-lock :initform (bt:make-lock "pause"))))
@@ -71,7 +74,7 @@
 (defgeneric decode-media-stream (record fsize input-stream))
 
 (defmethod decode-media-stream ((rec stream-record) fsize input-stream)
-  (read-sequence (frame (ar (wcursor rec))) input-stream :end fsize))
+  (read-sequence (frame (car (wcursor rec))) input-stream :end fsize))
 
 (defgeneric decode (stream)
   (:documentation "Decodes the video stream"))
