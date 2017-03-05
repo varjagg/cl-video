@@ -67,6 +67,7 @@
    (quality :accessor quality)
    (sample-size :accessor sample-size)
    (frame :accessor frame)
+   (frame-delay :accessor frame-delay :initarg :frame-delay)
    (index :accessor index)))
 
 (defclass mjpeg-stream-record (avi-stream-record video-stream-record)
@@ -197,6 +198,9 @@
        (setf (stream-records avi)
 	     (loop repeat (nstreams avi) collecting (read-avi-stream-info avi stream)))
        (return)))
+
+(defmethod find-pcm-stream-record ((container av-container))
+  nil)
 
 (defmethod find-pcm-stream-record ((avi avi-mjpeg-container))
   (find-if #'(lambda (x) (and (eql (type-of x) 'audio-stream-record)
