@@ -42,12 +42,15 @@
 	       (loop for y from 0 below (skippy:height image)
 		  for rowpos from (skippy:top-position image) do
 		    (loop for x from 0 below (skippy:width image)
-		       for pos = (* 3 (+ x (skippy:left-position image) (* width rowpos))) do
-			 (multiple-value-bind (r g b)
-			     (skippy:color-rgb (skippy:color-table-entry (skippy:color-table data-stream) (skippy:pixel-ref image x y)))
-			   (setf (aref frame pos) b
-				 (aref frame (1+ pos)) g
-				 (aref frame (+ pos 2)) r))))
+		       for pos = (* 3 (+ x (skippy:left-position image) (* width rowpos)))
+		       for index = (skippy:pixel-ref image x y) do
+			 (unless (eql index (skippy:transparency-index image))
+			   (multiple-value-bind (r g b)
+			       (skippy:color-rgb (skippy:color-table-entry
+						  (or (skippy:color-table image) (skippy:color-table data-stream)) index))
+			     (setf (aref frame pos) b
+				   (aref frame (1+ pos)) g
+				   (aref frame (+ pos 2)) r)))))
 	       (pop (wcursor rec))))
       (push rec (stream-records container))
       (unless (loopingp container)
