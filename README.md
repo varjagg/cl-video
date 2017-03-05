@@ -4,7 +4,7 @@ Simple video decoder written in Common Lisp. AVI/MJPEG playback leverages [CL-JP
 
 A primitive CLX media player is included. Playback of PCM encoded audio streams is supported.
 
-Has only been lightly tested on SBCL 13.x/Linux x86-64. CL-JPEG version 2.8 or higher is required.
+Has only lightly tested on SBCL 13.x/Linux x86-64, CCL 1.11 and Mezzano. CL-JPEG version 2.8 or higher is required.
 
 Some sample files can be found [here](https://cinelerra-cv.org/footage.php) (the toy plane AVI) and [here](http://jjc.freeshell.org/turning_pages.html).
 
