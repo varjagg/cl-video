@@ -46,7 +46,7 @@
 	   (portaudio:start-stream astream)
 	   (unwind-protect
 		(loop until (finish container)
-		   for cur = (if (pause container) cur (pop (rcursor audio-rec)))
+		   for cur = (if (pause container) cur (pop-chunk-rcursor audio-rec))
 		   for src = (frame cur) do
 		   ;; pause synching protocol w/video stream
 		     (bt:acquire-lock (pause-lock container))
@@ -86,7 +86,7 @@
 		  (xlib:map-window window)
 		  (stream-playback-start rec)
 		  (loop with quit = nil until quit
-		     for cur = (if (pause container) cur (pop (rcursor rec)))
+		     for cur = (if (pause container) cur (pop-chunk-rcursor rec))
 		     for src = (frame cur) do
 		       (loop for i from 0 below height do
 			    (loop for j from 0 below width
