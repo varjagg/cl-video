@@ -4,7 +4,7 @@
   :description "Video decoder core implemented in Common Lisp"
   :author "Eugene Zaikonnikov"
   :license "BSD"
-  :version "1.3"
+  :version "1.4"
   :depends-on (#:bordeaux-threads)
   :serial t
   :components ((:file "package")
