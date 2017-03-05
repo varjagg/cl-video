@@ -1,6 +1,6 @@
 # Video file decoding in Common Lisp
 
-Simple AVI/MJPEG video decoder written in Common Lisp. Leverages [CL-JPEG](https://github.com/sharplispers/cl-jpeg) for frame processing and [CL-RIFF](https://github.com/RobBlackwell/cl-riff) for container format handling.
+Simple video decoder written in Common Lisp. AVI/MJPEG playback leverages [CL-JPEG](https://github.com/sharplispers/cl-jpeg) for frame processing and [CL-RIFF](https://github.com/RobBlackwell/cl-riff) for container format handling. It also supports GIF playback via [Skippy](https://github.com/xach/skippy).
 
 A primitive CLX media player is included. Playback of PCM encoded audio streams is supported.
 
