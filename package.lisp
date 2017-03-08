@@ -4,7 +4,7 @@
   (:use #:cl #:alexandria)
   (:export #:decode-file #:decode #:find-mjpeg-stream-record #:find-pcm-stream-record #:av-container #:avi-mjpeg-container
 	   #:mjpeg-stream-record #:audio-stream-record #:initialize-ring #:decode-media-stream #:video-stream-record
-	   #:stream-playback-start #:stream-playback-stop #:chunk #:prime-all-streams
+	   #:stream-playback-start #:stream-playback-stop #:chunk #:prime-all-streams #:gif-container
 	   #:media-decoder-error #:unrecognized-file-format #:unsupported-avi-file-format #:malformed-avi-file-format
 	   #:wcursor #:rcursor #:vacancy-lock #:scale #:rate #:filename #:final #:finish #:frame-delay
 	   #:frame #:pause-lock #:vacancy-lock #:pause #:height #:width #:start #:suggested-buffer-size
