@@ -31,7 +31,7 @@
    (rcursor :accessor rcursor)
    (wcursor :accessor wcursor)
    (final :accessor final :initform nil)
-   (buffer :accessor buffer :type '(unsigned-byte 8))
+   (buffer :accessor buffer :type '(simple-array (unsigned-byte 8)))
    (container :accessor container :initarg :container)))
 
 (defgeneric frame-delay (record))
