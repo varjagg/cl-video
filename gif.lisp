@@ -3,17 +3,20 @@
 
 (in-package :cl-video)
 
+(declaim (optimize (speed 3) (safety 1)))
+
 (defclass gif-chunk (chunk)
-  ((strides :accessor strides :initarg :pixels)
-   (pos :reader pos :initarg :pos)
+  ((strides :accessor strides :initarg :strides)
+   (pos :reader pos :initarg :pos :type 'fixnum)
    (delay :reader delay :initarg :delay)
-   (span :accessor span :allocation :class :initarg :span)
-   (render :accessor render :allocation :class :initarg :render)))
+   (span :accessor span :allocation :class :initarg :span :type 'fixnum)
+   (render :accessor render :allocation :class :initarg :render :type '(simple-array (unsigned-byte 8) (*)))))
 
 (defmethod frame ((chunk gif-chunk))
-  (loop for stride in (strides chunk)
-     for index from (pos chunk) by (span chunk) do
-       (setf (subseq (render chunk) index) stride))
+  (declare (optimize (speed 3) (safety 0) (debug 0) (space 0)))
+  (loop for stride of-type (simple-array (unsigned-byte 8) (*)) in (strides chunk)
+     for index of-type fixnum from (pos chunk) by (span chunk) do
+       (setf (subseq (the (simple-array (unsigned-byte 8) (*)) (render chunk)) index) stride))
   (render chunk))
 
 (defclass gif-stream-record (video-stream-record)
@@ -32,14 +35,14 @@
       (let* ((data-stream (skippy:read-data-stream stream))
 	     (rec (make-instance 'gif-stream-record
 				 :container container))
-	     (buffer (make-array (* height width 3) :element-type '(unsigned-byte 8) :initial-element 0)))
+	     (buffer (make-array (* (skippy:height data-stream) (skippy:width data-stream) 3) :element-type '(unsigned-byte 8) :initial-element 0)))
 	(setf height (skippy:height data-stream)
 	      width (skippy:width data-stream)
 	      (number-of-frames container) (length (skippy:images data-stream))
 	      (loopingp container) (skippy:loopingp data-stream))
 	(initialize-ring rec (number-of-frames container))
 	;; initializing class-allocated slots here
-	(make-instance 'gif-chunk :span width :render (make-array (* height width 3) :element-type '(unsigned-byte 8) :initial-element 0))
+	(make-instance 'gif-chunk :span (* 3 width) :render (make-array (* height width 3) :element-type '(unsigned-byte 8) :initial-element 0))
 	(loop for image across (skippy:images data-stream)
 	   for strides = (loop for y from 0 below (skippy:height image)
 			    for rowpos from (skippy:top-position image)
