@@ -128,6 +128,7 @@
 (defun decode-file (pathname &key player-callback)
   (let ((container (make-instance (cond  ((string-equal "avi" (pathname-type pathname)) 'avi-mjpeg-container)
 					 ((string-equal "gif" (pathname-type pathname)) 'gif-container)
+					 ((string-equal "wav" (pathname-type pathname)) 'wav-container)
 					 (t (error 'unrecognized-file-format))) :filename pathname :player-callback player-callback)))
     (decode container)))
 
