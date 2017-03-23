@@ -15,28 +15,6 @@
 	     (format stream "Malformed WAV file format"))))
 
 (defclass wav-stream-record (stream-record)
-  ((fcc-type :accessor fcc-type)
-   (fcc-handler :accessor fcc-handler)
-   (flags :accessor flags)
-   (priority :accessor priority)
-   (language :accessor language)
-   (initial-frames :accessor initial-frames)
-   (scale :accessor scale)
-   (rate :accessor rate)
-   (start :accessor start)
-   (stream-length :accessor stream-length)
-   (suggested-buffer-size :accessor suggested-buffer-size)
-   (quality :accessor quality)
-   (sample-size :accessor sample-size)
-   (frame :accessor frame)
-   (frame-delay :accessor frame-delay :initarg :frame-delay)
-   (index :accessor index)))
-
-(defmethod stream-playback-start ((rec wav-stream-record))
-  (sleep (* (start rec) (/ (scale rec) (rate rec)))) ;stream delay, if any
-  (call-next-method))
-
-(defclass audio-stream-record (wav-stream-record)
   ((compression-code :accessor compression-code)
    (number-of-channels :accessor number-of-channels)
    (sample-rate :accessor sample-rate)
@@ -46,13 +24,16 @@
    (extra-format-bytes :accessor extra-format-bytes)
    (extra-bytes :accessor extra-bytes)))
 
-(defmethod shared-initialize :after ((rec audio-stream-record) slots &key &allow-other-keys)
+(defmethod stream-playback-start ((rec wav-stream-record))
+  (call-next-method))
+
+(defmethod shared-initialize :after ((rec wav-stream-record) slots &key &allow-other-keys)
   (declare (ignorable slots))
   (setf  (buffer rec) (make-array (suggested-buffer-size rec) :element-type '(unsigned-byte 8))))
 
-(defmethod read-audio-stream-header ((rec audio-stream-record) stream)
+(defmethod read-audio-stream-header ((rec wav-stream-record) stream)
   (loop for chunk = (riff:read-riff-chunk stream)
-     when (string-equal (riff:riff-chunk-id chunk) "strf") do
+     when (string-equal (riff:riff-chunk-id chunk) "fmt ") do
        (flexi-streams:with-input-from-sequence (is (riff:riff-chunk-data chunk))
 	(setf (compression-code rec) (riff:read-u2 is)
 	     (number-of-channels rec) (riff:read-u2 is)
@@ -67,7 +48,7 @@
 	 (read-sequence (extra-bytes rec) is)))
        (return)))
 
-(defmethod decode-media-stream ((rec audio-stream-record) fsize input-stream)
+(defmethod decode-media-stream ((rec wav-stream-record) fsize input-stream)
   (let* ((chunk (pop (wcursor rec)))
 	 (cur-lock (vacancy-lock chunk))
 	 (new-chunk (car (wcursor rec))))
@@ -89,27 +70,7 @@
   (loop for chunk = (riff:read-riff-chunk stream)
      with rec = (make-instance 'wav-stream-record :container wav)
      when (string-equal (riff:riff-chunk-id chunk) "strh") do
-       (flexi-streams:with-input-from-sequence (is (riff:riff-chunk-data chunk))
-	 (setf (fcc-type rec) (riff::read-fourcc is)
-	       (fcc-handler rec) (riff::read-fourcc is)
-	       (flags rec) (riff:read-u4 is)
-	       (priority rec) (riff:read-u2 is)
-	       (language rec) (riff:read-u2 is)
-	       (initial-frames rec) (riff:read-u4 is)
-	       (scale rec) (riff:read-u4 is)
-	       (rate rec) (riff:read-u4 is)
-	       (start rec) (riff:read-u4 is)
-	       (stream-length rec) (riff:read-u4 is)
-	       (suggested-buffer-size rec) (riff:read-u4 is)
-	       (quality rec) (riff:read-u4 is)
-	       (sample-size rec) (riff:read-u4 is)
-	       (frame rec) (list (riff:read-u2 is) (riff:read-u2 is) (riff:read-u2 is) (riff:read-u2 is))))
-       (when (and (string-equal (fcc-type rec) "vids") (not (member (fcc-handler rec) '("mjpg") :test #'string-equal)))
-	 (error 'unsupported-wav-file-format))
-       (cond ((and (string-equal (fcc-type rec) "vids") (string-equal (fcc-handler rec) "mjpg"))
-	      (change-class rec 'mjpeg-stream-record) (setf (frame-delay rec) (/ (scale rec) (rate rec))))
-	     ((string-equal (fcc-type rec) "auds")
-	      (change-class rec 'audio-stream-record) (read-audio-stream-header rec stream) (setf (frame-delay rec) (/ (scale rec) (rate rec)))))
+       (read-audio-stream-header rec stream)
        (return-from read-wav-stream-info rec))
   (error 'malformed-wav-file-format))
 
@@ -136,8 +97,8 @@
   nil)
 
 (defmethod find-pcm-stream-record ((wav wav-container))
-  (find-if #'(lambda (x) (and (eql (type-of x) 'audio-stream-record)
-			      (eql (compression-code x) +pcmi-uncompressed+))) (stream-records wav)))
+  ;; only one stream in wav container
+  (car (stream-records wav)))
 
 (defmethod decode ((wav wav-container))
   (with-open-file (stream (filename wav) :direction :input :element-type '(unsigned-byte 8))
@@ -147,7 +108,7 @@
 	   (fourcc (getf chunk :file-type)))
       (unless (string-equal id "riff")
 	(error 'unrecognized-file-format))
-      (cond ((string-equal fourcc "wav ") (read-wav-header wav stream))
+      (cond ((string-equal fourcc "wave") (read-wav-header wav stream))
 	    (t (error 'unsupported-wav-file-format))))
     (when (player-callback wav)
       (funcall (player-callback wav) wav))
@@ -157,7 +118,3 @@
 	 (setf (final rec) (car (wcursor rec)))
 	 (bt:release-lock (vacancy-lock (car (wcursor rec)))))))
 
-(defun show-file-chunks (pathname)
-  (with-open-file (stream pathname :direction :input :element-type '(unsigned-byte 8))
-    (loop for chunk = (riff:read-riff-chunk stream)
-	 while chunk do (format t "~A size ~D~%" (riff:riff-chunk-id chunk) (riff:riff-chunk-data-size chunk)))))
