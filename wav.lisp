@@ -2,6 +2,9 @@
 
 (define-constant  +pcmi-uncompressed+ 1)
 
+(define-constant +frame-duration-seconds+ 5)
+(define-constant +chunk-granularity-scale+ 10) ;10 per second
+
 (define-condition unsupported-wav-file-format (media-decoder-error)
   ()
   (:report (lambda (condition stream)
@@ -26,9 +29,6 @@
 
 (defmethod stream-playback-start ((rec wav-stream-record))
   (call-next-method))
-
-(define-constant +frame-duration-seconds+ 5)
-(define-constant +chunk-granularity-scale+ 10) ;10 per second
 
 (defmethod shared-initialize :after ((rec wav-stream-record) slots &key &allow-other-keys)
   (declare (ignorable slots))
@@ -59,14 +59,11 @@
     (bt:release-lock cur-lock)))
 
 (defclass wav-container (av-container)
-  ())
+  (chunk-decoder :accessor chunk-decoder))
 
 (defmethod initialize-instance :after ((s wav-container) &key &allow-other-keys)
   (setf (chunk-decoder s) #'(lambda (stream id size)
-			      (if (member (subseq id 2) '("dc" "wb") :test #'string-equal)
-				  (progn (decode-media-stream (elt (stream-records s) (parse-integer (subseq id 0 2))) size stream)
-					 (when (plusp (padding s)) (loop repeat (rem size (padding s)) do (read-byte s))))
-				  (read-sequence (make-array size :element-type '(unsigned-byte 8)) stream)))))
+			      (decode-media-stream (car (stream-records s)) size stream))))
 
 (defmethod read-wav-stream-info ((wav wav-container) stream)
   (loop for chunk = (riff:read-riff-chunk stream)
