@@ -30,10 +30,13 @@
 (defmethod stream-playback-start ((rec wav-stream-record))
   (call-next-method))
 
+(defmethod frame-size ((rec wav-stream-record))
+  (/ (* (sample-rate rec) (block-align rec)) +chunk-granularity-scale+))
+
 (defmethod shared-initialize :after ((rec wav-stream-record) slots &key &allow-other-keys)
   (declare (ignorable slots))
   (initialize-ring rec (/ +frame-duration-seconds+ +chunk-granularity-scale+)
-		   :frame-size (/ (* (sample-rate rec) (block-align rec)) +chunk-granularity-scale+)))
+		   :frame-size (frame-size rec)))
 
 (defmethod read-audio-stream-header ((rec wav-stream-record) stream)
   (let ((chunk (riff:read-riff-chunk stream)))
@@ -51,15 +54,21 @@
 	(read-sequence (extra-bytes rec) is)))))
 
 (defmethod decode-media-stream ((rec wav-stream-record) fsize input-stream)
-  (let* ((chunk (pop (wcursor rec)))
-	 (cur-lock (vacancy-lock chunk))
-	 (new-chunk (car (wcursor rec))))
-    (bt:acquire-lock (vacancy-lock new-chunk))
-    (read-sequence (frame chunk) input-stream :end fsize)
-    (bt:release-lock cur-lock)))
+  (loop with frame-size = (frame-size rec)
+     repeat (ceiling fsize frame-size) ; break down single large data frame into chunks
+     summing frame-size into thus-far
+     do (let* ((chunk (pop (wcursor rec)))
+	       (cur-lock (vacancy-lock chunk))
+	       (new-chunk (car (wcursor rec))))
+	  (bt:acquire-lock (vacancy-lock new-chunk))
+	  (read-sequence (frame chunk) input-stream
+			 :end (if (>= (- thus-far fsize) frame-size)
+				  frame-size
+				  (rem fsize frame-size)))
+	  (bt:release-lock cur-lock))))
 
 (defclass wav-container (av-container)
-  (chunk-decoder :accessor chunk-decoder))
+  ((chunk-decoder :accessor chunk-decoder)))
 
 (defmethod initialize-instance :after ((s wav-container) &key &allow-other-keys)
   (setf (chunk-decoder s) #'(lambda (stream id size)
