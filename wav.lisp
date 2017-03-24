@@ -31,7 +31,11 @@
   (call-next-method))
 
 (defmethod frame-size ((rec wav-stream-record))
+  ;;TODO: check it aligns the blocks well without skips/pauses
   (setf (suggested-buffer-size rec) (ceiling (/ (sample-rate rec) (block-align rec)) +chunk-granularity-scale+)))
+
+(defmethod frame-delay ((rec wav-stream-record))
+  0)
 
 (defmethod read-audio-stream-header ((rec wav-stream-record) stream)
   (let ((chunk (riff:read-riff-chunk stream)))
@@ -67,7 +71,9 @@
   ((chunk-decoder :accessor chunk-decoder)))
 
 (defmethod initialize-instance :after ((s wav-container) &key &allow-other-keys)
+  (push (make-instance 'static-stream-record :container s) (stream-records s))
   (setf (chunk-decoder s) #'(lambda (stream id size)
+			      (declare (ignorable id))
 			      (decode-media-stream (car (stream-records s)) size stream))))
 
 (defmethod read-wav-stream-info ((wav wav-container) stream)
