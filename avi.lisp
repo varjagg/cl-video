@@ -63,7 +63,6 @@
    (rate :accessor rate)
    (start :accessor start)
    (stream-length :accessor stream-length)
-   (suggested-buffer-size :accessor suggested-buffer-size)
    (quality :accessor quality)
    (sample-size :accessor sample-size)
    (frame :accessor frame)

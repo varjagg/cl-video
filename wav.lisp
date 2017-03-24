@@ -3,7 +3,7 @@
 (define-constant  +pcmi-uncompressed+ 1)
 
 (define-constant +frame-duration-seconds+ 5)
-(define-constant +chunk-granularity-scale+ 10) ;10 per second
+(define-constant +chunk-granularity-scale+ 8) ;8 per second
 
 (define-condition unsupported-wav-file-format (media-decoder-error)
   ()
@@ -31,12 +31,7 @@
   (call-next-method))
 
 (defmethod frame-size ((rec wav-stream-record))
-  (/ (* (sample-rate rec) (block-align rec)) +chunk-granularity-scale+))
-
-(defmethod shared-initialize :after ((rec wav-stream-record) slots &key &allow-other-keys)
-  (declare (ignorable slots))
-  (initialize-ring rec (/ +frame-duration-seconds+ +chunk-granularity-scale+)
-		   :frame-size (frame-size rec)))
+  (setf (suggested-buffer-size rec) (ceiling (/ (sample-rate rec) (block-align rec)) +chunk-granularity-scale+)))
 
 (defmethod read-audio-stream-header ((rec wav-stream-record) stream)
   (let ((chunk (riff:read-riff-chunk stream)))
@@ -51,7 +46,8 @@
       (unless (eql (compression-code rec) +pcmi-uncompressed+)
 	(setf (extra-format-bytes rec) (riff:read-u2 is)
 	      (extra-bytes rec) (make-array (extra-format-bytes rec) :element-type (stream-element-type is)))
-	(read-sequence (extra-bytes rec) is)))))
+	(read-sequence (extra-bytes rec) is))
+      (initialize-ring rec (* +frame-duration-seconds+ +chunk-granularity-scale+) (frame-size rec)))))
 
 (defmethod decode-media-stream ((rec wav-stream-record) fsize input-stream)
   (loop with frame-size = (frame-size rec)
@@ -83,8 +79,8 @@
   (error 'malformed-wav-file-format))
 
 (defmethod read-wav ((wav wav-container) stream)
-  (setf (stream-records wav)
-	(read-wav-stream-info wav stream)))
+  (push (read-wav-stream-info wav stream)
+	(stream-records wav)))
 
 (defmethod find-pcm-stream-record ((wav wav-container))
   ;; only one stream in wav container
