@@ -4,5 +4,6 @@
   :license "BSD"
   :depends-on (#:alexandria #:cl-riff #:cl-video #:flexi-streams)
   :serial t
-  :components ((:file "wav")))
+  :components ((:file "static")
+	       (:file "wav")))
 

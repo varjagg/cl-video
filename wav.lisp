@@ -108,4 +108,6 @@
        while (and chunk (not (finish wav))))
     (let ((rec (car (stream-records wav))))
       (setf (final rec) (car (wcursor rec)))
-      (bt:release-lock (vacancy-lock (car (wcursor rec)))))))
+      (bt:release-lock (vacancy-lock (car (wcursor rec)))))
+    (let ((vrec (find-video-stream-record wav)))
+      (bt:release-lock (vacancy-lock (car (wcursor vrec)))))))
