@@ -32,7 +32,7 @@
 
 (defmethod frame-size ((rec wav-stream-record))
   ;;TODO: check it aligns the blocks well without skips/pauses
-  (setf (suggested-buffer-size rec) (ceiling (/ (sample-rate rec) (block-align rec)) +chunk-granularity-scale+)))
+  (/ (* (sample-rate rec) (block-align rec)) +chunk-granularity-scale+))
 
 (defmethod frame-delay ((rec wav-stream-record))
   0)
@@ -51,9 +51,12 @@
 	(setf (extra-format-bytes rec) (riff:read-u2 is)
 	      (extra-bytes rec) (make-array (extra-format-bytes rec) :element-type (stream-element-type is)))
 	(read-sequence (extra-bytes rec) is))
-      (initialize-ring rec (* +frame-duration-seconds+ +chunk-granularity-scale+) (frame-size rec)))))
+      (initialize-ring rec (* +frame-duration-seconds+ +chunk-granularity-scale+)
+		       (/ (frame-size rec) (/ (significant-bits-per-sample rec) 8))
+		       (sink-frame-element-type (audio-out (container rec)))))))
 
 (defmethod decode-media-stream ((rec wav-stream-record) fsize input-stream)
+  (setf (buffer rec) (make-array (frame-size rec) :element-type '(unsigned-byte 8)))
   (loop with frame-size = (frame-size rec)
      repeat (ceiling fsize frame-size) ; break down single large data frame into chunks
      summing frame-size into thus-far
@@ -61,10 +64,11 @@
 	       (cur-lock (vacancy-lock chunk))
 	       (new-chunk (car (wcursor rec))))
 	  (bt:acquire-lock (vacancy-lock new-chunk))
-	  (read-sequence (frame chunk) input-stream
-			 :end (if (>= (- thus-far fsize) frame-size)
-				  frame-size
-				  (rem fsize frame-size)))
+	  (read-sequence (buffer rec) input-stream
+			 :end (1- (if (>= (- fsize thus-far) frame-size)
+				      frame-size
+				      (rem fsize frame-size))))
+	  (translate-source-frame (audio-out (container rec)) (frame chunk))
 	  (bt:release-lock cur-lock))))
 
 (defclass wav-container (av-container)
@@ -77,12 +81,9 @@
 			      (decode-media-stream (car (stream-records s)) size stream))))
 
 (defmethod read-wav-stream-info ((wav wav-container) stream)
-  (loop for chunk = (riff:read-riff-chunk stream)
-     with rec = (make-instance 'wav-stream-record :container wav)
-     when (string-equal (riff:riff-chunk-id chunk) "fmt ") do
-       (read-audio-stream-header rec stream)
-       (return-from read-wav-stream-info rec))
-  (error 'malformed-wav-file-format))
+  (let ((rec (make-instance 'wav-stream-record :container wav)))
+    (read-audio-stream-header rec stream)
+    rec))
 
 (defmethod read-wav ((wav wav-container) stream)
   (push (read-wav-stream-info wav stream)

@@ -1,49 +1,49 @@
 (in-package :cl-video)
 
-;;; we speccialize own class & method to process the audio stream into floats as portaudio wants
+;;; a class & method to process the audio stream into floats as portaudio wants
 ;;; but we still want to run decode in another thread to avoid the skips
-(defclass portaudio-pcm-stream-record (audio-stream-record)
-  ())
+(defclass portaudio-pcm-output (audio-output)
+  ((astream :accessor astream)))
 
-(defmethod decode-media-stream ((rec portaudio-pcm-stream-record) fsize input-stream)
-  (let* ((chunk (pop (wcursor rec)))
-	 (cur-lock (vacancy-lock chunk))
-	 (new-chunk (car (wcursor rec))))
-    (bt:acquire-lock (vacancy-lock new-chunk))
-    (read-sequence (buffer rec) input-stream :end fsize)
-    (flexi-streams:with-input-from-sequence (is (buffer rec))
-      (let ((sample-size (/ (block-align rec) (number-of-channels rec))))
-	(loop for i from 0 below fsize do
-	     (setf (aref (frame chunk) i) (if (= sample-size 1)
-					    (float (/ (- (read-byte is) 128) 128))
-					    (float (/ (let ((u2 (riff:read-u2 is)))
-							(if (> u2 32767)
-							    (- u2 65536)
-							    u2))
-						      32768)))))))
-    (bt:release-lock cur-lock)))
+(defmethod sink-frame-element-type ((aout portaudio-pcm-output))
+  'float)
 
-(defmethod shared-initialize :after ((rec portaudio-pcm-stream-record) slots &key &allow-other-keys)
-  (declare (ignorable slots))
-  (setf  (buffer rec) (make-array (suggested-buffer-size rec) :element-type '(unsigned-byte 8)))
-  (initialize-ring rec 16 (suggested-buffer-size rec) 'float))
+(defmethod initialize-sink ((aout portaudio-pcm-output))
+  (portaudio:initialize)
+  (with-slots (audio-rec astream) aout
+    (setf astream
+	  (portaudio:open-default-stream 0 (number-of-channels audio-rec) :float (coerce (sample-rate audio-rec) 'double-float)
+					 (/ (frame-size audio-rec) (/ (significant-bits-per-sample audio-rec) 8))))
+    (portaudio:start-stream astream)))
 
-(defmethod find-portaudio-stream-record ((container av-container))
-  (find-if #'(lambda (x) (and (eql (type-of x) 'portaudio-pcm-stream-record)
-			      (eql (compression-code x) +pcmi-uncompressed+))) (stream-records container)))
+(defmethod sink-frame ((aout portaudio-pcm-output) frame)
+  (portaudio:write-stream (astream aout) frame))
 
+(defmethod close-sink ((aout portaudio-pcm-output))
+  (portaudio:close-stream (astream aout))
+  (portaudio:terminate))
+
+(defmethod translate-source-frame ((aout portaudio-pcm-output) frame)
+  (with-slots (audio-rec) aout
+    (flexi-streams:with-input-from-sequence (is (buffer audio-rec))
+      (let ((sample-size (/ (block-align audio-rec) (number-of-channels audio-rec))))
+	(loop for i from 0 below (length frame) do
+	     (setf (aref frame i) (if (= sample-size 1)
+				      (float (/ (- (read-byte is) 128) 128))
+				      (float (/ (let ((u2 (riff:read-u2 is)))
+						  (if (> u2 32767)
+						      (- u2 65536)
+						      u2))
+						32768)))))))))
+  
 (defmethod play-audio-stream ((container av-container))
-  (let ((audio-rec (find-portaudio-stream-record container))
-	astream)
-    (when audio-rec
+  (let* ((aout (audio-out container))
+	 (audio-rec (audio-rec aout)))
+    (when aout
       (bt:make-thread
        #'(lambda ()
-	   (portaudio:initialize)
 	   (stream-playback-start audio-rec)
-	   (setf astream
-		 (portaudio:open-default-stream 0 (number-of-channels audio-rec) :float (coerce (sample-rate audio-rec) 'double-float)
-						(/ (/ (rate audio-rec) (scale audio-rec)) (number-of-channels audio-rec))))
-	   (portaudio:start-stream astream)
+	   (initialize-sink aout)
 	   (unwind-protect
 		(loop until (finish container)
 		   for cur = (if (pause container) cur (pop-chunk-rcursor audio-rec))
@@ -51,7 +51,7 @@
 		   ;; pause synching protocol w/video stream
 		     (bt:acquire-lock (pause-lock container))
 		   ;; send the audio frame
-		     (portaudio:write-stream astream src)
+		     (sink-frame aout src)
 		     (loop while (pause container) do (sleep 0.2))
 		     (bt:release-lock (pause-lock container))
 		   ;; advance the cursor lock
@@ -60,9 +60,8 @@
 		     (when (eql cur (final audio-rec))
 		       (return))
 		     (sleep (frame-delay audio-rec)))
-	     (portaudio:close-stream astream)
 	     (stream-playback-stop audio-rec)
-	     (portaudio:terminate)))
+	     (close-sink aout)))
        :name "Audio stream playback"))))
     
 (defmethod play-video-stream ((container av-container))
@@ -129,7 +128,9 @@
   (let ((container (make-instance (cond  ((string-equal "avi" (pathname-type pathname)) 'avi-mjpeg-container)
 					 ((string-equal "gif" (pathname-type pathname)) 'gif-container)
 					 ((string-equal "wav" (pathname-type pathname)) 'wav-container)
-					 (t (error 'unrecognized-file-format))) :filename pathname :player-callback player-callback)))
+					 (t (error 'unrecognized-file-format)))
+				  :filename pathname :player-callback player-callback
+				  :audio-out (make-instance 'portaudio-pcm-output))))
     (decode container)))
 
 (defun play (pathname)
@@ -137,6 +138,6 @@
 	       #'(lambda (video)
 		   ;;has to use our specific decode for audio
 		   (let ((a (find-pcm-stream-record video)))
-		     (when a (change-class a 'portaudio-pcm-stream-record)))
+		     (when a (setf (audio-rec (audio-out video)) a)))
 		   (prime-all-streams video)
 		   (play-audio-stream video) (play-video-stream video))))

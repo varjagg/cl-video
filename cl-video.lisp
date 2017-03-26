@@ -22,6 +22,24 @@
 	     (declare (ignorable condition))
 	     (format stream "Unrecognized file format"))))
 
+(defclass audio-output ()
+  ((audio-rec :accessor audio-rec)))
+
+(defgeneric initialize-sink (audio-output)
+  (:documentation "Initialize output stream"))
+
+(defgeneric sink-frame-element-type (audio-output)
+  (:documentation "Data type for the output records used when creating frames in a ring buffer"))
+
+(defgeneric sink-frame (audio-output frame)
+  (:documentation "Play back the frame"))
+
+(defgeneric translate-source-frame (audio-output frame)
+  (:documentation "Transcribe uint8 frame into someting playable by the output"))
+
+(defgeneric close-sink (audio-output)
+  (:documentation "Close output stream"))
+
 (defclass chunk ()
   ((lock :reader vacancy-lock :initform (bt:make-lock "vacancy"))
    (frame :accessor frame :initarg :frame)))
@@ -64,6 +82,7 @@
 
 (defclass av-container ()
   ((filename :accessor filename :initarg :filename :initform nil)
+   (audio-out :accessor audio-out :type 'audio-output :initarg :audio-out)
    (player-callback :accessor player-callback :initarg :player-callback :initform nil) ;;called once all headers are processed
    (width :accessor width :initarg :width :initform 640)
    (height :accessor height :initarg :height :initform 480)
