@@ -4,7 +4,7 @@
   ())
 
 (defmethod initialize-instance :after ((rec static-stream-record) &key &allow-other-keys)
-  (initialize-ring rec 4 (* 640 480 3) '(unsigned-byte 8)))
+  (initialize-ring rec 1 (* 640 480 3) '(unsigned-byte 8)))
 
 (defmethod stream-playback-start ((rec static-stream-record))
   (bt:release-lock (vacancy-lock (car (wcursor rec))))
