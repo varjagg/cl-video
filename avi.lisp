@@ -1,3 +1,7 @@
+;;;; Video decoder implementation
+;;;; Supports MJPEG in AVI container
+;;;; (c) 2017 Eugene Zaikonnikov <eugene@fucall.org>
+
 (in-package :cl-video)
 
 (define-constant +avif-must-use-index+ #x20) 
@@ -96,9 +100,12 @@
    (extra-format-bytes :accessor extra-format-bytes)
    (extra-bytes :accessor extra-bytes)))
 
-(defmethod shared-initialize :after ((rec audio-stream-record) slots &key &allow-other-keys)
+#+nil(defmethod shared-initialize :after ((rec audio-stream-record) slots &key &allow-other-keys)
   (declare (ignorable slots))
   (setf  (buffer rec) (make-array (suggested-buffer-size rec) :element-type '(unsigned-byte 8))))
+
+(defmethod frame-size ((rec audio-stream-record))
+  (suggested-buffer-size rec))
 
 (defmethod read-audio-stream-header ((rec audio-stream-record) stream)
   (loop for chunk = (riff:read-riff-chunk stream)
@@ -116,7 +123,7 @@
 		 (extra-bytes rec) (make-array (extra-format-bytes rec) :element-type (stream-element-type is)))
 	   (read-sequence (extra-bytes rec) is)))
        (setf (buffer rec) (make-array (suggested-buffer-size rec) :element-type '(unsigned-byte 8)))
-       (initialize-ring rec 16 (suggested-buffer-size rec) '(unsigned-byte 8))
+       (initialize-ring rec 16 (suggested-buffer-size rec) (sink-frame-element-type (audio-out (container rec))))
        (return)))
 
 (defclass avi-mjpeg-container (av-container)
@@ -130,7 +137,8 @@
 	 (cur-lock (vacancy-lock chunk))
 	 (new-chunk (car (wcursor rec))))
     (bt:acquire-lock (vacancy-lock new-chunk))
-    (read-sequence (frame chunk) input-stream :end fsize)
+    (read-sequence (buffer rec) input-stream :end fsize)
+    (translate-source-frame (audio-out (container rec)) (frame chunk))
     (bt:release-lock cur-lock)))
 
 (defmethod decode-media-stream ((rec mjpeg-stream-record) fsize input-stream)
