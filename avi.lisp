@@ -115,6 +115,8 @@
 	   (setf (extra-format-bytes rec) (riff:read-u2 is)
 		 (extra-bytes rec) (make-array (extra-format-bytes rec) :element-type (stream-element-type is)))
 	   (read-sequence (extra-bytes rec) is)))
+       (setf (buffer rec) (make-array (suggested-buffer-size rec) :element-type '(unsigned-byte 8)))
+       (initialize-ring rec 16 (suggested-buffer-size rec) '(unsigned-byte 8))
        (return)))
 
 (defclass avi-mjpeg-container (av-container)
