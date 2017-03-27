@@ -1,5 +1,4 @@
-;;;; Video decoder implementation
-;;;; Supports MJPEG in AVI container
+;;;; Generic definitions for video/audio decoding
 ;;;; (c) 2017 Eugene Zaikonnikov <eugene@fucall.org>
 
 (in-package #:cl-video)

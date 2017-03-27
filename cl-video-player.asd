@@ -4,4 +4,5 @@
   :license "BSD"
   :depends-on (#:cl-video-avi #:cl-video-gif #:cl-video-wav #:clx #:bordeaux-threads #:cl-portaudio)
   :serial t
-  :components ((:file "player")))
+  :components ((:file "portaudio-out")
+	       (:file "player")))
