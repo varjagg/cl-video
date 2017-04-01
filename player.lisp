@@ -3,7 +3,7 @@
 (defmethod play-audio-stream ((container av-container))
   (let* ((aout (audio-out container))
 	 (audio-rec (audio-rec aout)))
-    (when aout
+    (when audio-rec
       (bt:make-thread
        #'(lambda ()
 	   (stream-playback-start audio-rec)
