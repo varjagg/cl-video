@@ -22,7 +22,7 @@
 	     (format stream "Unrecognized file format"))))
 
 (defclass audio-output ()
-  ((audio-rec :accessor audio-rec)))
+  ((audio-rec :accessor audio-rec :initform nil)))
 
 (defgeneric initialize-sink (audio-output)
   (:documentation "Initialize output stream"))
